@@ -1,0 +1,7 @@
+.vscode/
+*.code-workspace
+
+iCheckMovies_Enhanced/
+*.json
+*.txt
+Temp.user.js

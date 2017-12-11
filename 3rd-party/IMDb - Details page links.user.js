@@ -28,7 +28,7 @@ const urlTemplates = [
     ['RYM', 'http://rateyourmusic.com/search?searchterm={title}&searchtype=F'],
     ['KinoPoisk', 'https://www.kinopoisk.ru/index.php?level=7&from=forma&result=adv&m_act[from]=forma&m_act[what]=content&m_act[find]={titlePlused}&m_act[from_year]={year_min}&m_act[to_year]={year_max}'],
     [],
-    ['RuTracker', 'https://rutracker.cr/forum/tracker.php?nm={titlePlain} {year}&o=7&s=2'],
+    ['RuTracker', 'https://rutracker.net/forum/tracker.php?nm={titlePlain} {year}&o=7&s=2'],
     ['KaraGarga', 'https://karagarga.in/browse.php?incldead=&d=&sort=added&d=DESC&search={nottimdbid}&search_type=imdb'],
     ['PassThePopcorn', 'https://passthepopcorn.me/torrents.php?action=advanced&searchstr={imdbid}'],
     ['ThePirateBay', 'https://thepiratebay.org/search/{titlePlain} {year}/0/5/0'],

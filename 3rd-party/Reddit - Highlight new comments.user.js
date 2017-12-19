@@ -63,7 +63,7 @@ const main = () => {
     }
 
     // Don't reset timer in single comment's threads
-    if (/\/[0-9a-z]+\/$/.test(document.URL)) return;
+    if (/\/[0-9a-z]+\/(\?.+)?$/.test(document.URL)) return;
     console.log('Setting localStorage to now.');
     localStorage.setItem(threadID, Date.now());
 };

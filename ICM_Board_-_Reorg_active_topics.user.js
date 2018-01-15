@@ -4,8 +4,7 @@
 // @namespace      monk-time
 // @author         monk-time
 // @include        http://www.icmforum.com/search/*?c=5
-// @require        http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js
-// @grant          none
+// @icon           https://www.icheckmovies.com/favicon.ico
 // ==/UserScript==
 
 'use strict';
@@ -16,6 +15,7 @@
 const forumsToHide = [
     'Challenges',
     'Past Challenges',
+    'Games',
     // 'Music, Games, Books and TV',
     // 'Off-Topic',
 ];
@@ -32,7 +32,6 @@ const idsToLeave = [
     '7151806', // Future challenges
     '7975745', // Japanese Music
     '7342342', // The Music Lounge
-    '8050665', // Do you eat meat?
 ];
 
 // ids of threads to hide (regardless of their subforum)
@@ -44,80 +43,87 @@ const idsToHide = [
     '7068112', // Football
     '7662108', // Celebrity Crush
     '7292379', // Weight Loss
-    '652575', // What are you listening to right now?
+    '652575',  // What are you listening to right now?
     '8303834', // Armo's 555 favourite tracks
+    '7837525', // Guess the song
 ];
 
 // the order of subforums (threads will be sorted by subforum, then by alphabet)
-const catMap = [
-    'iCM & List Discussion',
+const forums = [
+    'List Discussion',
     'General Film Discussion',
     'Private Section',
+    'Our lists and projects',
     'Challenges',
 ];
 
 // ----- MAIN -----
 
-function getThreadId($row) {
-    const url = $row.find('.c_cat-title:nth-of-type(2) > a').attr('href');
-    const re = url.match(/topic\/(\d+)\/$/);
-    return re && re[1] || '';
-}
+const getRowData = row => {
+    const [title, forum] = [...row.querySelectorAll('.c_cat-title > a')]
+        .map(x => x.textContent.trim());
+    const id = row.querySelector('a').href.match(/topic\/(\d+)\/$/);
+    const key = forums.includes(forum) ?
+        String(forums.indexOf(forum)) :
+        String(forums.length) + forum;
+    const isRead = row.querySelector('img').alt.endsWith(' (No new posts)');
+    return {
+        id: id && id[1] || '',
+        title: title.toLowerCase(),
+        forum,
+        key,
+        isRead,
+    };
+};
 
-function getTitle($row) {
-    return $row.find('.c_cat-title:first > a').text().trim().toLowerCase();
-}
+// The first table row is the header
+const table = document.querySelector('.forums > tbody');
+const allRows = [...table.children].slice(1); // skip the header
+const rowData = new Map(allRows.map(r => [r, getRowData(r)]));
 
-function getForum($row) {
-    return $row.find('.c_cat-title:odd > a').text();
-}
+// Compare topics by unread/read, then by forum, then by title
+const compareByUnreadForumTitle = (rA, rB) => {
+    const [dA, dB] = [rowData.get(rA), rowData.get(rB)];
+    return dA.isRead - dB.isRead ||
+        dA.key.localeCompare(dB.key) ||
+        dA.title.localeCompare(dB.title);
+};
 
-function getForumIndex($row) { // --> String
-    const cat = getForum($row);
-    if (catMap.includes(cat)) {
-        return String(catMap.indexOf(cat));
-    }
+const reorderThreads = rows => table.append(...rows.sort(compareByUnreadForumTitle));
 
-    return String(catMap.length) + cat;
-}
+// Hide by subforum (excluding specified threads) or by thread title
+const hideThreads = rows => rows
+    .filter(r => {
+        const { forum, id } = rowData.get(r);
+        return forumsToHide.includes(forum) && !idsToLeave.includes(id) ||
+            idsToHide.includes(id);
+    })
+    .forEach(r => r.classList.add('rat-hidden'));
 
-let rows = $('.forums > tbody > tr').slice(1); // all threads except header
+const hideHeaderAnnouncements = () => {
+    const topElems = [...document.querySelector('#main').children];
+    const firstVisible = topElems.find(el => el.matches('#search_results_topics, .cat-pages'));
+    const elemsToHide = topElems.slice(0, topElems.indexOf(firstVisible));
 
-// hide by subforums, excluding specified threads
-rows.filter((_, el) => forumsToHide.indexOf(getForum($(el))) > -1)
-    .filter((_, el) => idsToLeave.indexOf(getThreadId($(el))) === -1)
-    .hide();
+    const cnt = document.createElement('div');
+    cnt.id = 'announcements';
+    cnt.style.display = 'none';
+    cnt.append(...elemsToHide);
+    firstVisible.before(cnt);
 
-// hide by topics
-rows.filter((_, el) => idsToHide.indexOf(getThreadId($(el))) > -1)
-    .hide();
+    const btn = document.createElement('button');
+    btn.textContent = 'Toggle announcements';
+    btn.addEventListener('click', () => {
+        cnt.style.display = cnt.style.display === 'none' ? 'inline' : 'none';
+    });
+    document.getElementById('nav').append(btn);
+};
 
-// hide header announcements
-const hideUntil = $('#search_results_topics, .cat-pages').first();
-$('#main').children().eq(1).nextUntil(hideUntil)
-    .wrapAll('<div id="announcements"/>')
-    .parent()
-    .toggle();
-$('<button>Toggle announcements</button>')
-    .click(() => $('#announcements').toggle())
-    .add('<br>')
-    .insertBefore('#announcements');
+document.head.insertAdjacentHTML('beforeend', `<style>
+    ul.cat-pages { margin:  5px 0 }
+    .rat-hidden  { display: none }
+</style>`);
 
-// re-sort topics (unread first)
-rows = rows.filter(':visible');
-const read = rows.filter((_, el) =>
-    $(el).find('.c_cat-mark > img[alt*=" (No new posts)"]').length > 0);
-const unread = rows.not(read);
-
-[unread, read].forEach(topics => {
-    topics.detach().sort((a, b) => {
-        const $a = $(a);
-        const $b = $(b);
-        const aF = getForumIndex($a);
-        const bF = getForumIndex($b);
-        if (aF < bF) return -1;
-        if (aF > bF) return 1;
-
-        return getTitle($a) < getTitle($b) ? -1 : 1;
-    }).appendTo('.forums > tbody');
-});
+reorderThreads(allRows);
+hideThreads(allRows);
+hideHeaderAnnouncements();

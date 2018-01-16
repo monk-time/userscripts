@@ -8,7 +8,7 @@
 // @require        https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
 // @icon           http://www.imdb.com/favicon.ico
 // @grant          GM_addStyle
-// @version        2.4.0
+// @version        2.4.1
 // ==/UserScript==
 
 //
@@ -17,6 +17,10 @@
 // 3.0
 // fixed: enable on pages with a referal in the query string
 // changed: criticker score conversion: 0..10 -> 1, 11..20 -> 2, 91..100 -> 10
+//
+// 2.4.1
+// bugfix: In some instances the script wasn't loaded (bad @include)
+// change: Limit number of setTimeOut calls
 //
 // 2.4.0
 // fixed: IMDb changed layout
@@ -51,6 +55,7 @@ const REQUEST_DELAY = 1000;
 
 const parsers = {
     imdb: line => {
+        // TODO: fix for the new layout
         const fields = line.split('","');
         if (fields.length !== 16 || !fields[1].startsWith('tt') || !fields[8]) return null;
         return { movie: fields[1], rating: fields[8] };
@@ -67,11 +72,11 @@ const parsers = {
     },
 };
 
-const process = (file, parser) => {
+const parseFile = (file, parser) => {
     for (const line of file.split('\n')) {
         const m = parser(line);
         if (!m) continue;
-        $('#film-list').append(`${m.rating},${m.movie}\n`);
+        ui.filmList.append(`${m.rating},${m.movie}\n`);
     }
 };
 
@@ -83,7 +88,7 @@ const handleImport = e => {
         if (format === 'none') {
             alert('Select importer and try again.');
         } else if (parsers[format]) {
-            process(file, parsers[format]);
+            parseFile(file, parsers[format]);
         }
     };
 
@@ -92,7 +97,7 @@ const handleImport = e => {
 };
 
 const ListManager = {
-    regex: '^(.*)$',
+    regex: '(tt\\d+)',
     processRegex: ([, filmTitle], cb) => cb(filmTitle),
     handleSelection: (imdbId, cb) => cb(),
 };
@@ -128,116 +133,128 @@ const RatingManager = {
     },
 };
 
+document.head.insertAdjacentHTML('beforeend', `<style>
+    #ilh-ui {
+        margin: 0 5% 5% 5%;
+        padding: 10px;
+        border: 1px solid #e8e8e8;
+    }
+
+    #ilh-ui input[type=text] {
+        width: 100%;
+        font-family: monospace;
+    }
+
+    #ilh-ui #ilh-regexp {
+        margin-top: 4px;
+        margin-left: 1px;
+    }
+
+    #ilh-ui textarea {
+        width: 100%;
+        background-color: lightyellow;
+    }
+
+    #ilh-ui span {
+        font-weight: bold;
+    }
+</style>`);
+
+const uiHTML = `
+    <div id="ilh-ui">
+        <p>
+            <b>Import mode:</b>
+            <input type="radio" name="importmode" value="list" checked>List</input>
+            <input type="radio" name="importmode" value="ratings">Ratings</input>
+        </p>
+        <textarea id="ilh-film-list" rows="7" cols="60" placeholder="Input titles or IMDb IDs and click Start"></textarea>
+        <br>
+        <input type="button" id="ilh-start" value="Start">
+        <input type="button" id="ilh-skip" value="Skip">
+        <input type="button" id="ilh-retry" value="Retry">
+        <span>Remaining: <span id="ilh-films-remaining">0</span></span>
+        <br><br>
+        <span>Current: <input type="text" id="ilh-current-film" size="65""></span>
+        <br>
+        <span>Regexp (matches only): <input type="text" id="ilh-regexp" size="65"></span>
+        <br>
+        <p id="ilh-import-form" style="display: none">
+            <b>Import from:</b>
+            <select name="import">
+                <option value="none">Select</option>
+                <option value="imdb">IMDb</option>
+                <option value="rym">RateYourMusic</option>
+                <option value="criticker">Criticker</option>
+            </select>
+            <b>File:</b>
+            <input type="file" id="ilh-file-import">
+        </p>
+    </div>`;
+
+document.querySelector('div.lister-search').insertAdjacentHTML('afterend', uiHTML);
+
+const innerIDs = [
+    'film-list',
+    'start',
+    'skip',
+    'retry',
+    'films-remaining',
+    'current-film',
+    'regexp',
+    'import-form',
+    'file-import',
+];
+
+const camelCase = s => s.replace(/-[a-z]/g, m => m[1].toUpperCase());
+// Main object for interacting with the script's UI; keys match element ids
+const ui = Object.assign(...innerIDs.map(id => ({
+    [camelCase(id)]: document.getElementById(`ilh-${id}`),
+})));
+
+[ui.radioList, ui.radioRatings] = document.querySelectorAll('#ilh-ui input[name=importmode]');
+
 const App = {
     manager: ListManager,
     films: [],
     regexObj: null,
-    isEmpty: () => App.films.length === 0,
-    next: () => App.films.shift(),
     run: () => {
-        GM_addStyle(`
-            #imdb-list-text-edit {
-                margin: 0 5% 5% 5%;
-                padding: 10px;
-                border: 1px solid #e8e8e8;
-            }
+        ui.regexp.value = App.manager.regex;
 
-            #imdb-list-text-edit input[type=text] {
-                width: 100%;
-                font-family: monospace;
-            }
+        ui.fileImport.addEventListener('change', handleImport);
 
-            #imdb-list-text-edit #film-regexp {
-                margin-top: 4px;
-                margin-left: 1px;
-            }
+        ui.radioList.addEventListener('change', () => {
+            App.manager = ListManager;
+            ui.importForm.style.display = 'none';
+            ui.regexp.value = App.manager.regex;
+        });
 
-            #imdb-list-text-edit textarea {
-                width: 100%;
-                background-color: lightyellow;
-            }
-
-            #imdb-list-text-edit span {
-                font-weight: bold;
-            }
-        `);
-        const textEdit = `
-            <div id="imdb-list-text-edit">
-                <p>
-                    <b>Import mode:</b>
-                    <input type="radio" name="importmode" value="list" checked="checked">List</input>
-                    <input type="radio" name="importmode" value="ratings">Ratings</input>
-                </p>
-                <textarea id="film-list" rows="7" cols="60" placeholder="Input titles or IMDb IDs and click Start"></textarea>
-                <br>
-                <input type="button" id="doList" value="Start">
-                <input type="button" id="skipFilm" value="Skip">
-                <input type="button" id="retryPost" value="Retry">
-                <span>Remaining: <span id="films-remaining">0</span></span>
-                <br><br>
-                <span>Current: <input type="text" id="film-current" size="65""></span>
-                <br>
-                <span>Regexp (matches only): <input type="text" id="film-regexp" size="65"></span>
-                <br>
-                <p id="importform" style="display: none">
-                    <b>Import from:</b>
-                    <select name="import">
-                        <option value="none">Select</option>
-                        <option value="imdb">IMDb</option>
-                        <option value="rym">RateYourMusic</option>
-                        <option value="criticker">Criticker</option>
-                    </select>
-                    <b>File:</b>
-                    <input type="file" id="fileimport">
-                </p>
-            </div>`;
-        $('div.lister-search').after(textEdit);
-
-        $('#film-regexp').val(App.manager.regex);
-
-        $('#fileimport').on('change', handleImport);
-
-        $('#imdb-list-text-edit').on('change', 'input[name=importmode]', function () {
-            const value = $(this).val();
-            if (value === 'list') {
-                App.manager = ListManager;
-                $('#importform').hide();
-            } else {
-                App.manager = RatingManager;
-                $('#importform').show();
-            }
-
-            $('#film-regexp').val(App.manager.regex);
+        ui.radioRatings.addEventListener('change', () => {
+            App.manager = RatingManager;
+            ui.importForm.style.display = 'block';
+            ui.regexp.value = App.manager.regex;
         });
 
         // When start button is clicked
-        $('#imdb-list-text-edit').on('click', '#doList', () => {
-            const $regexBox = $('#film-regexp');
-            if ($regexBox.val()) {
-                App.regexObj = RegExp($regexBox.val());
+        ui.start.addEventListener('click', () => {
+            if (ui.regexp.value) {
+                App.regexObj = RegExp(ui.regexp.value);
             } else {
                 App.regexObj = RegExp(App.manager.regex);
             }
 
-            // Disable the text area and the button and the regexp box
-            // as well as the import mode
-            const $filmList = $('#film-list');
-            $filmList.attr('disabled', 'disabled');
-            $regexBox.attr('disabled', 'disabled');
-            $('#doList').attr('disabled', 'disabled');
-            $('input[name=importmode]').attr('disabled', 'disabled');
+            // Disable relevant UI elements
+            [ui.filmList, ui.start, ui.regexp, ui.radioList, ui.radioRatings]
+                .forEach(el => { el.disabled = true; });
 
-            App.films = $filmList.val().split('\n');
+            App.films = ui.filmList.value.split('\n');
             App.handleNext();
         });
 
         // when skip button is clicked
-        $('#imdb-list-text-edit').on('click', '#skipFilm', () => {
-            App.handleNext();
-        });
+        ui.skip.addEventListener('click', () => App.handleNext());
 
         // Sometimes the request fails forcing the user to skip an entry to continue
-        $('#imdb-list-text-edit').on('click', '#retryPost', () => {
+        ui.retry.addEventListener('click', () => {
             $('#add-to-list-search').trigger('keydown');
         });
     },
@@ -245,28 +262,24 @@ const App = {
         App.films = [];
         App.regexObj = null;
 
-        $('#film-list').removeAttr('disabled');
-        $('#film-regexp').removeAttr('disabled'); // leave regex
-        $('#doList').removeAttr('disabled');
-        $('input[name=importmode]').removeAttr('disabled');
+        [ui.filmList, ui.start, ui.regexp, ui.radioList, ui.radioRatings]
+            .forEach(el => { el.disabled = false; });
 
-        $('#film-current').val('');
+        ui.currentFilm.value = '';
 
         $('#add-to-list-search', 'div.add').val('');
-        // $("div.results", "div.add").html("");
     },
     search: filmTitle => {
         // remove unnecessary whitespace
-        filmTitle = $.trim(filmTitle);
+        filmTitle = filmTitle.trim();
 
         // set current text to what we're searching
-        $('#film-current').val(filmTitle);
+        ui.currentFilm.value = filmTitle;
 
         // remove the first title from the text box and set the remaining number
-        const $filmList = $('#film-list');
-        const newList = $filmList.val().split('\n');
-        $('#films-remaining').text(newList.length - 1);
-        $filmList.val(newList.slice(1).join('\n'));
+        const newList = ui.filmList.value.split('\n');
+        ui.filmsRemaining.textContent = newList.length - 1;
+        ui.filmList.value = newList.slice(1).join('\n');
 
         // Run regex if it matches and let the manager process the result
         const result = App.regexObj.exec(filmTitle);
@@ -283,17 +296,13 @@ const App = {
         }
     },
     handleNext: () => {
-        if (!App.isEmpty()) {
-            // if there's more items, search next...
-            App.search(App.next());
-        } else {
-            // if last film
+        if (App.films.length !== 0) {
+            App.search(App.films.shift());
+        } else { // if last film
             App.reset();
         }
     },
 };
-
-$(document).ready(App.run);
 
 // When a search result item is clicked by user or script
 $('#add-to-list-search-results').on('click', 'a', function () {
@@ -308,12 +317,15 @@ $('#add-to-list-search-results').on('click', 'a', function () {
 // since there's only one result
 let clickId = null;
 $('#add-to-list-search-results').bind('DOMNodeInserted', () => {
-    if ($('#film-current').val().match(/([CHMNTchmnt]{2}[0-9]{7})/) !== null &&
-        $('a', '#add-to-list-search-results').length) {
+    if (clickId === null && $('a', '#add-to-list-search-results').length &&
+        /([CHMNTchmnt]{2}[0-9]{7})/.test(ui.currentFilm.value)) {
         // Some delay is needed for all results to appear
         clickId = setTimeout(() => {
             $('a', '#add-to-list-search-results').first()[0].click();
             clearTimeout(clickId);
+            clickId = null;
         }, REQUEST_DELAY);
     }
 });
+
+App.run();

@@ -16,6 +16,7 @@
 //
 // 3.0
 // fixed: enable on pages with a referal in the query string
+// fixed: search by movie title
 // changed: criticker score conversion: 0..10 -> 1, 11..20 -> 2, 91..100 -> 10
 //
 // 2.4.1
@@ -84,7 +85,7 @@ const handleImport = e => {
     const reader = new FileReader();
     reader.onload = event => {
         const file = event.target.result;
-        const format = $('select[name=import]').val();
+        const format = ui.importSel.value;
         if (format === 'none') {
             alert('Select importer and try again.');
         } else if (parsers[format]) {
@@ -98,38 +99,46 @@ const handleImport = e => {
 
 const ListManager = {
     regex: '(tt\\d+)',
-    processRegex: ([, filmTitle], cb) => cb(filmTitle),
-    handleSelection: (imdbId, cb) => cb(),
+    processRegex: ([, filmTitle], callback) => callback(filmTitle),
+    handleSelection: (imdbID, callback) => callback(),
 };
 
 const RatingManager = {
     rating: 0,
     regex: '^([1-9]|10),(.*)$',
-    processRegex: ([, rating, filmTitle], cb) => {
+    processRegex: ([, rating, filmTitle], callback) => {
         RatingManager.rating = rating;
-        cb(filmTitle);
+        callback(filmTitle);
     },
-    handleSelection: (imdbId, cb) => {
-        console.log(`RatingManager::handleSelection: Rating ${imdbId}`);
-        $.get(`http://www.imdb.com/title/${imdbId}`, data => {
-            const authHash = $(data).find('#star-rating-widget').data('auth');
-            const params = {
-                tconst: imdbId,
-                rating: RatingManager.rating,
-                auth: authHash,
-                tracking_tag: 'list',
-                pageId: imdbId,
-                pageType: 'title',
-                subPageType: 'main',
-            };
-            $.post('http://www.imdb.com/ratings/_ajax/title', params, resp => {
-                if (resp.status !== 200) {
-                    alert(`Rating failed. Status code ${resp.status}`);
-                } else {
-                    cb();
-                }
-            }, 'json');
+    handleSelection: async (imdbID, callback) => {
+        console.log(`RatingManager::handleSelection: Rating ${imdbID}`);
+        const moviePage = await fetch(
+            `http://www.imdb.com/title/${imdbID}/`,
+            { credentials: 'same-origin' },
+        );
+        const authHash = new DOMParser()
+            .parseFromString(await moviePage.text(), 'text/html')
+            .getElementById('star-rating-widget')
+            .dataset.auth;
+
+        const params = {
+            tconst: imdbID,
+            rating: RatingManager.rating,
+            auth: authHash,
+            tracking_tag: 'list',
+        };
+
+        const postResp = await fetch('http://www.imdb.com/ratings/_ajax/title', {
+            method: 'POST',
+            body: new URLSearchParams(params),
+            credentials: 'same-origin',
         });
+
+        if (postResp.ok) {
+            callback();
+        } else {
+            alert(`Rating failed. Status code ${postResp.status}`);
+        }
     },
 };
 
@@ -169,18 +178,18 @@ const uiHTML = `
         </p>
         <textarea id="ilh-film-list" rows="7" cols="60" placeholder="Input titles or IMDb IDs and click Start"></textarea>
         <br>
-        <input type="button" id="ilh-start" value="Start">
-        <input type="button" id="ilh-skip" value="Skip">
-        <input type="button" id="ilh-retry" value="Retry">
+        <input type="button" value="Start" id="ilh-start">
+        <input type="button" value="Skip"  id="ilh-skip">
+        <input type="button" value="Retry" id="ilh-retry">
         <span>Remaining: <span id="ilh-films-remaining">0</span></span>
         <br><br>
         <span>Current: <input type="text" id="ilh-current-film" size="65""></span>
         <br>
         <span>Regexp (matches only): <input type="text" id="ilh-regexp" size="65"></span>
         <br>
-        <p id="ilh-import-form" style="display: none">
+        <p id="ilh-import" style="display: none">
             <b>Import from:</b>
-            <select name="import">
+            <select name="import" id="ilh-import-sel">
                 <option value="none">Select</option>
                 <option value="imdb">IMDb</option>
                 <option value="rym">RateYourMusic</option>
@@ -201,7 +210,8 @@ const innerIDs = [
     'films-remaining',
     'current-film',
     'regexp',
-    'import-form',
+    'import',
+    'import-sel',
     'file-import',
 ];
 
@@ -212,6 +222,7 @@ const ui = Object.assign(...innerIDs.map(id => ({
 })));
 
 [ui.radioList, ui.radioRatings] = document.querySelectorAll('#ilh-ui input[name=importmode]');
+const elIMDbSearch = document.getElementById('add-to-list-search');
 
 const App = {
     manager: ListManager,
@@ -224,13 +235,13 @@ const App = {
 
         ui.radioList.addEventListener('change', () => {
             App.manager = ListManager;
-            ui.importForm.style.display = 'none';
+            ui.import.style.display = 'none';
             ui.regexp.value = App.manager.regex;
         });
 
         ui.radioRatings.addEventListener('change', () => {
             App.manager = RatingManager;
-            ui.importForm.style.display = 'block';
+            ui.import.style.display = 'block';
             ui.regexp.value = App.manager.regex;
         });
 
@@ -255,7 +266,7 @@ const App = {
 
         // Sometimes the request fails forcing the user to skip an entry to continue
         ui.retry.addEventListener('click', () => {
-            $('#add-to-list-search').trigger('keydown');
+            elIMDbSearch.dispatchEvent(new Event('keydown'));
         });
     },
     reset: () => {
@@ -266,8 +277,7 @@ const App = {
             .forEach(el => { el.disabled = false; });
 
         ui.currentFilm.value = '';
-
-        $('#add-to-list-search', 'div.add').val('');
+        elIMDbSearch.value = '';
     },
     search: filmTitle => {
         // remove unnecessary whitespace
@@ -285,11 +295,9 @@ const App = {
         const result = App.regexObj.exec(filmTitle);
         if (result !== null) {
             App.manager.processRegex(result, filmTitle2 => {
-                // Set imdb search input field to film title
-                $('#add-to-list-search').val(filmTitle2);
-
-                // And perform search
-                $('#add-to-list-search').trigger('keydown');
+                // Set imdb search input field to film title and trigger search
+                elIMDbSearch.value = filmTitle2;
+                elIMDbSearch.dispatchEvent(new Event('keydown'));
             });
         } else {
             App.handleNext();
@@ -304,28 +312,29 @@ const App = {
     },
 };
 
-// When a search result item is clicked by user or script
-$('#add-to-list-search-results').on('click', 'a', function () {
-    App.manager.handleSelection($(this).attr('id'), () => {
-        // Some delay is needed
+const elIMDbResults = document.getElementById('add-to-list-search-results');
+
+// Handle clicks on search results by a user or the script
+elIMDbResults.addEventListener('click', e => {
+    const imdbID = e.target.dataset.const;
+    if (!imdbID.startsWith('tt')) return;
+    App.manager.handleSelection(imdbID, () => {
         setTimeout(() => App.handleNext(), REQUEST_DELAY);
     });
 });
 
-// Monitors for changes to the search result box
-// If it recognizes an IMDBb URL/ID, it's clicked automatically
-// since there's only one result
-let clickId = null;
-$('#add-to-list-search-results').bind('DOMNodeInserted', () => {
-    if (clickId === null && $('a', '#add-to-list-search-results').length &&
-        /([CHMNTchmnt]{2}[0-9]{7})/.test(ui.currentFilm.value)) {
-        // Some delay is needed for all results to appear
-        clickId = setTimeout(() => {
-            $('a', '#add-to-list-search-results').first()[0].click();
-            clearTimeout(clickId);
-            clickId = null;
-        }, REQUEST_DELAY);
-    }
-});
+// Monitor for changes to the search result box.
+// If the search was for IMDb URL/ID, the only result is clicked automatically
+let clickID = null;
+const mut = new MutationObserver(mutList => mutList.forEach(({ addedNodes }) => {
+    if (!addedNodes.length || clickID || !/(nm|tt)\d{7}/i.test(ui.currentFilm.value)) return;
+    // Some delay is needed for all results to appear
+    clickID = setTimeout(() => {
+        addedNodes[0].click();
+        clearTimeout(clickID);
+        clickID = null;
+    }, REQUEST_DELAY);
+}));
+mut.observe(elIMDbResults, { childList: true });
 
 App.run();

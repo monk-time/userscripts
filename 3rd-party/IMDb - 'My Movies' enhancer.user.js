@@ -110,6 +110,7 @@
 
 // TODO: test in Chrome
 // TODO: check if the html returned instead of csv contains csv header
+// TODO: list export format has changed? investigate
 
 'use strict';
 
@@ -369,7 +370,7 @@ const parseMyLists = () => {
             // If custom priority for defaultList is missing, set the lowest priority
             const { rank = defaultColors.length, color } =
                 defaultsObj[name] || defaultsObj[defaultList];
-            return { id, name, rank, color }; // eslint-disable-line object-curly-newline
+            return { id, name, rank, color };
         });
 
     if (!customLists.length) console.error('No custom movie lists found');
@@ -560,6 +561,8 @@ const formMovieListsHTML = mID => {
     const ratings = m ?
         `Your rating: ${m}${i ? ` (IMDb: ${i})<br>` : ''}` :
         i ? `IMDb rating: ${i}<br>` : '';
+    if (!names.length) return ratings;
+
     const header = names.length === 1 ?
         '<b>In your list:</b><br>' :
         `<b>In ${names.length} of your lists:</b><br>`;

@@ -5,7 +5,6 @@
 // @author         themagician, monk-time
 // @include        http://*imdb.com/list/*/edit
 // @include        http://*imdb.com/list/*/edit?*
-// @require        https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
 // @icon           http://www.imdb.com/favicon.ico
 // @grant          GM_addStyle
 // @version        2.4.1
@@ -17,6 +16,7 @@
 // 3.0
 // fixed: enable on pages with a referal in the query string
 // fixed: search by movie title
+// fixed: no longer requires jQuery
 // changed: criticker score conversion: 0..10 -> 1, 11..20 -> 2, 91..100 -> 10
 //
 // 2.4.1
@@ -54,93 +54,7 @@
 // milliseconds between each request
 const REQUEST_DELAY = 1000;
 
-const parsers = {
-    imdb: line => {
-        // TODO: fix for the new layout
-        const fields = line.split('","');
-        if (fields.length !== 16 || !fields[1].startsWith('tt') || !fields[8]) return null;
-        return { movie: fields[1], rating: fields[8] };
-    },
-    rym: line => {
-        const fields = line.split('","');
-        if (fields.length < 6) return null;
-        return { movie: fields[1], rating: fields[4] };
-    },
-    criticker: line => { // if exported as .txt
-        const fields = line.match(/(\d+)\t(.+)/);
-        if (!fields || Number.isNaN(+fields[1])) return null;
-        return { movie: fields[2], rating: Math.ceil(+fields[1] / 10) || 1 };
-    },
-};
-
-const parseFile = (file, parser) => {
-    for (const line of file.split('\n')) {
-        const m = parser(line);
-        if (!m) continue;
-        ui.filmList.append(`${m.rating},${m.movie}\n`);
-    }
-};
-
-const handleImport = e => {
-    const reader = new FileReader();
-    reader.onload = event => {
-        const file = event.target.result;
-        const format = ui.importSel.value;
-        if (format === 'none') {
-            alert('Select importer and try again.');
-        } else if (parsers[format]) {
-            parseFile(file, parsers[format]);
-        }
-    };
-
-    const [file] = e.target.files;
-    reader.readAsText(file);
-};
-
-const ListManager = {
-    regex: '(tt\\d+)',
-    processRegex: ([, filmTitle], callback) => callback(filmTitle),
-    handleSelection: (imdbID, callback) => callback(),
-};
-
-const RatingManager = {
-    rating: 0,
-    regex: '^([1-9]|10),(.*)$',
-    processRegex: ([, rating, filmTitle], callback) => {
-        RatingManager.rating = rating;
-        callback(filmTitle);
-    },
-    handleSelection: async (imdbID, callback) => {
-        console.log(`RatingManager::handleSelection: Rating ${imdbID}`);
-        const moviePage = await fetch(
-            `http://www.imdb.com/title/${imdbID}/`,
-            { credentials: 'same-origin' },
-        );
-        const authHash = new DOMParser()
-            .parseFromString(await moviePage.text(), 'text/html')
-            .getElementById('star-rating-widget')
-            .dataset.auth;
-
-        const params = {
-            tconst: imdbID,
-            rating: RatingManager.rating,
-            auth: authHash,
-            tracking_tag: 'list',
-        };
-
-        const postResp = await fetch('http://www.imdb.com/ratings/_ajax/title', {
-            method: 'POST',
-            body: new URLSearchParams(params),
-            credentials: 'same-origin',
-        });
-
-        if (postResp.ok) {
-            callback();
-        } else {
-            alert(`Rating failed. Status code ${postResp.status}`);
-        }
-    },
-};
+// ----- DOM ELEMENTS: STYLING, CREATION AND TRACKING -----
 
 document.head.insertAdjacentHTML('beforeend', `<style>
     #ilh-ui {
@@ -216,6 +130,7 @@ const innerIDs = [
 ];
 
 const camelCase = s => s.replace(/-[a-z]/g, m => m[1].toUpperCase());
+
 // Main object for interacting with the script's UI; keys match element ids
 const ui = Object.assign(...innerIDs.map(id => ({
     [camelCase(id)]: document.getElementById(`ilh-${id}`),
@@ -223,6 +138,97 @@ const ui = Object.assign(...innerIDs.map(id => ({
 
 [ui.radioList, ui.radioRatings] = document.querySelectorAll('#ilh-ui input[name=importmode]');
 const elIMDbSearch = document.getElementById('add-to-list-search');
+const elIMDbResults = document.getElementById('add-to-list-search-results');
+
+// ----- HANDLERS AND ACTIONS -----
+
+const parsers = {
+    imdb: line => {
+        // TODO: fix for the new layout
+        const fields = line.split('","');
+        if (fields.length !== 16 || !fields[1].startsWith('tt') || !fields[8]) return null;
+        return { movie: fields[1], rating: fields[8] };
+    },
+    rym: line => {
+        const fields = line.split('","');
+        if (fields.length < 6) return null;
+        return { movie: fields[1], rating: fields[4] };
+    },
+    criticker: line => { // if exported as .txt
+        const fields = line.match(/(\d+)\t(.+)/);
+        if (!fields || Number.isNaN(+fields[1])) return null;
+        return { movie: fields[2], rating: Math.ceil(+fields[1] / 10) || 1 };
+    },
+};
+
+const parseFile = (file, parser) => {
+    for (const line of file.split('\n')) {
+        const m = parser(line);
+        if (!m) continue;
+        ui.filmList.append(`${m.rating},${m.movie}\n`);
+    }
+};
+
+const handleImport = e => {
+    const reader = new FileReader();
+    reader.onload = event => {
+        const file = event.target.result;
+        const format = ui.importSel.value;
+        if (format === 'none') {
+            alert('Select importer and try again.');
+        } else if (parsers[format]) {
+            parseFile(file, parsers[format]);
+        }
+    };
+
+    const [file] = e.target.files;
+    reader.readAsText(file);
+};
+
+const RatingManager = {
+    rating: 0,
+    regex: '^([1-9]|10),(.*)$',
+    processRegex: ([, rating, filmTitle], callback) => {
+        RatingManager.rating = rating;
+        callback(filmTitle);
+    },
+    handleSelection: async (imdbID, callback) => {
+        console.log(`RatingManager::handleSelection: Rating ${imdbID}`);
+        const moviePage = await fetch(
+            `http://www.imdb.com/title/${imdbID}/`,
+            { credentials: 'same-origin' },
+        );
+        const authHash = new DOMParser()
+            .parseFromString(await moviePage.text(), 'text/html')
+            .getElementById('star-rating-widget')
+            .dataset.auth;
+
+        const params = {
+            tconst: imdbID,
+            rating: RatingManager.rating,
+            auth: authHash,
+            tracking_tag: 'list',
+        };
+
+        const postResp = await fetch('http://www.imdb.com/ratings/_ajax/title', {
+            method: 'POST',
+            body: new URLSearchParams(params),
+            credentials: 'same-origin',
+        });
+
+        if (postResp.ok) {
+            callback();
+        } else {
+            alert(`Rating failed. Status code ${postResp.status}`);
+        }
+    },
+};
+
+const ListManager = {
+    regex: '(tt\\d+)',
+    processRegex: ([, filmTitle], callback) => callback(filmTitle),
+    handleSelection: (imdbID, callback) => callback(),
+};
 
 const App = {
     manager: ListManager,
@@ -269,6 +275,13 @@ const App = {
             elIMDbSearch.dispatchEvent(new Event('keydown'));
         });
     },
+    handleNext: () => {
+        if (App.films.length !== 0) {
+            App.search(App.films.shift());
+        } else { // if last film
+            App.reset();
+        }
+    },
     reset: () => {
         App.films = [];
         App.regexObj = null;
@@ -303,16 +316,7 @@ const App = {
             App.handleNext();
         }
     },
-    handleNext: () => {
-        if (App.films.length !== 0) {
-            App.search(App.films.shift());
-        } else { // if last film
-            App.reset();
-        }
-    },
 };
-
-const elIMDbResults = document.getElementById('add-to-list-search-results');
 
 // Handle clicks on search results by a user or the script
 elIMDbResults.addEventListener('click', e => {

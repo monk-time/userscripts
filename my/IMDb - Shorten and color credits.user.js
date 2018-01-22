@@ -29,8 +29,8 @@ if (shortenCredits) {
 if (colorNonFeatures) {
     $$(`${section('director')} > *`).forEach(el => {
         const text = el.textContent.trim().replace(/\n+/g, ' ');
-        const re = /\([^)]*(segment|pre-production|as |uncredited)[^)]*\)/i;
-        if (text.search(re) > -1) {
+        const re = /\([^)]*(segment|pre-production|uncredited)[^)]*\)/i;
+        if (re.test(text)) {
             el.style.opacity = 0.6;
         }
     });

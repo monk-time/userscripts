@@ -14,10 +14,12 @@
 // CHANGELOG
 //
 // 3.0
-// fixed: enable on pages with a referal in the query string
-// fixed: search by movie title
-// fixed: no longer requires jQuery
-// changed: criticker score conversion: 0..10 -> 1, 11..20 -> 2, 91..100 -> 10
+// fixed: Enable on pages with a referal in the query string
+// fixed: Search by movie title
+// fixed: No longer requires jQuery
+// fixed: Remove delay before auto-clicking on a search result
+// changed: Criticker score conversion: 0..10 -> 1, 11..20 -> 2, 91..100 -> 10
+// changed: If the regex fails, try searching for the whole string
 //
 // 2.4.1
 // bugfix: In some instances the script wasn't loaded (bad @include)
@@ -188,7 +190,7 @@ const handleImport = e => {
 const RatingManager = {
     rating: 0,
     regex: '^([1-9]|10),(.*)$',
-    processRegex: ([, rating, filmTitle], callback) => {
+    processRegexMatch: ([, rating, filmTitle], callback) => {
         RatingManager.rating = rating;
         callback(filmTitle);
     },
@@ -225,8 +227,8 @@ const RatingManager = {
 };
 
 const ListManager = {
-    regex: '(tt\\d+)',
-    processRegex: ([, filmTitle], callback) => callback(filmTitle),
+    regex: '((?:tt|nm)\\d+)',
+    processRegexMatch: ([, filmTitle], callback) => callback(filmTitle),
     handleSelection: (imdbID, callback) => callback(),
 };
 
@@ -253,17 +255,13 @@ const App = {
 
         // When start button is clicked
         ui.start.addEventListener('click', () => {
-            if (ui.regexp.value) {
-                App.regexObj = RegExp(ui.regexp.value);
-            } else {
-                App.regexObj = RegExp(App.manager.regex);
-            }
+            App.regexObj = RegExp(ui.regexp.value || App.manager.regex, 'i');
 
             // Disable relevant UI elements
             [ui.filmList, ui.start, ui.regexp, ui.radioList, ui.radioRatings]
                 .forEach(el => { el.disabled = true; });
 
-            App.films = ui.filmList.value.split('\n');
+            App.films = ui.filmList.value.trim().split('\n');
             App.handleNext();
         });
 
@@ -276,7 +274,7 @@ const App = {
         });
     },
     handleNext: () => {
-        if (App.films.length !== 0) {
+        if (App.films.length) {
             App.search(App.films.shift());
         } else { // if last film
             App.reset();
@@ -293,21 +291,22 @@ const App = {
         elIMDbSearch.value = '';
     },
     search: filmTitle => {
-        // remove unnecessary whitespace
+        // Remove unnecessary whitespace
         filmTitle = filmTitle.trim();
 
-        // set current text to what we're searching
+        // Set current text to what we're searching
         ui.currentFilm.value = filmTitle;
 
-        // remove the first title from the text box and set the remaining number
-        const newList = ui.filmList.value.split('\n');
-        ui.filmsRemaining.textContent = newList.length - 1;
-        ui.filmList.value = newList.slice(1).join('\n');
+        // Remove the first title from the text box and set the remaining number
+        ui.filmsRemaining.textContent = App.films.length;
+        ui.filmList.value = App.films.join('\n');
 
-        // Run regex if it matches and let the manager process the result
-        const result = App.regexObj.exec(filmTitle);
-        if (result !== null) {
-            App.manager.processRegex(result, filmTitle2 => {
+        // Run regex if it matches and let the manager process the result.
+        // Otherwise try searching for the whole line before skipping it.
+        // eslint-disable-next-line no-sparse-arrays
+        const result = App.regexObj.exec(filmTitle) || [, filmTitle];
+        if (result) {
+            App.manager.processRegexMatch(result, filmTitle2 => {
                 // Set imdb search input field to film title and trigger search
                 elIMDbSearch.value = filmTitle2;
                 elIMDbSearch.dispatchEvent(new Event('keydown'));
@@ -329,15 +328,9 @@ elIMDbResults.addEventListener('click', e => {
 
 // Monitor for changes to the search result box.
 // If the search was for IMDb URL/ID, the only result is clicked automatically
-let clickID = null;
 const mut = new MutationObserver(mutList => mutList.forEach(({ addedNodes }) => {
-    if (!addedNodes.length || clickID || !/(nm|tt)\d{7}/i.test(ui.currentFilm.value)) return;
-    // Some delay is needed for all results to appear
-    clickID = setTimeout(() => {
-        addedNodes[0].click();
-        clearTimeout(clickID);
-        clickID = null;
-    }, REQUEST_DELAY);
+    if (!addedNodes.length || !/(nm|tt)\d{7}/i.test(ui.currentFilm.value)) return;
+    addedNodes[0].click();
 }));
 mut.observe(elIMDbResults, { childList: true });
 

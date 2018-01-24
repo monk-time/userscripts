@@ -5,6 +5,7 @@
 // @author         themagician, monk-time
 // @include        http://*imdb.com/list/*/edit
 // @include        http://*imdb.com/list/*/edit?*
+// @require        https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
 // @icon           http://www.imdb.com/favicon.ico
 // @grant          GM_addStyle
 // @version        2.4.1
@@ -16,9 +17,10 @@
 // 3.0
 // fixed: Enable on pages with a referal in the query string
 // fixed: Search by movie title
-// fixed: No longer requires jQuery
+// fixed: No longer requires jQuery; jquery-csv is replaced with d3-dsv
 // fixed: Remove delay before auto-clicking on a search result
 // changed: Criticker score conversion: 0..10 -> 1, 11..20 -> 2, 91..100 -> 10
+// changed: Criticker importer requires .csv
 // changed: If the regex fails, try searching for the whole string
 //
 // 2.4.1
@@ -51,6 +53,8 @@
 // fixed: some entries are skipped when adding imdb ids/urls
 //
 
+/* global d3 */
+
 'use strict';
 
 // milliseconds between each request
@@ -63,6 +67,10 @@ document.head.insertAdjacentHTML('beforeend', `<style>
         margin: 0 5% 5% 5%;
         padding: 10px;
         border: 1px solid #e8e8e8;
+    }
+
+    #ilh-ui label {
+        font-weight: normal;
     }
 
     #ilh-ui input[type=text] {
@@ -78,6 +86,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     #ilh-ui textarea {
         width: 100%;
         background-color: lightyellow;
+        overflow: auto;
     }
 
     #ilh-ui span {
@@ -89,8 +98,12 @@ const uiHTML = `
     <div id="ilh-ui">
         <p>
             <b>Import mode:</b>
-            <input type="radio" name="importmode" value="list" checked>List</input>
-            <input type="radio" name="importmode" value="ratings">Ratings</input>
+            <label>
+                <input type="radio" name="importmode" value="list" checked>List</input>
+            </label>
+            <label>
+                <input type="radio" name="importmode" value="ratings">Ratings</input>
+            </label>
         </p>
         <textarea id="ilh-film-list" rows="7" cols="60" placeholder="Input titles or IMDb IDs and click Start"></textarea>
         <br>
@@ -104,15 +117,15 @@ const uiHTML = `
         <span>Regexp (matches only): <input type="text" id="ilh-regexp" size="65"></span>
         <br>
         <p id="ilh-import" style="display: none">
-            <b>Import from:</b>
+            <b>Import .csv from:</b>
             <select name="import" id="ilh-import-sel">
-                <option value="none">Select</option>
+                <option value="" selected disabled hidden>Select</option>
                 <option value="imdb">IMDb</option>
                 <option value="rym">RateYourMusic</option>
                 <option value="criticker">Criticker</option>
             </select>
             <b>File:</b>
-            <input type="file" id="ilh-file-import">
+            <input type="file" id="ilh-file-import" disabled>
         </p>
     </div>`;
 
@@ -144,43 +157,27 @@ const elIMDbResults = document.getElementById('add-to-list-search-results');
 
 // ----- HANDLERS AND ACTIONS -----
 
-const parsers = {
-    imdb: line => {
-        // TODO: fix for the new layout
-        const fields = line.split('","');
-        if (fields.length !== 16 || !fields[1].startsWith('tt') || !fields[8]) return null;
-        return { movie: fields[1], rating: fields[8] };
-    },
-    rym: line => {
-        const fields = line.split('","');
-        if (fields.length < 6) return null;
-        return { movie: fields[1], rating: fields[4] };
-    },
-    criticker: line => { // if exported as .txt
-        const fields = line.match(/(\d+)\t(.+)/);
-        if (!fields || Number.isNaN(+fields[1])) return null;
-        return { movie: fields[2], rating: Math.ceil(+fields[1] / 10) || 1 };
-    },
+const convertRating = n => Math.ceil(n / 10) || 1; // 0..100 -> 1..10
+// d3 skips a row if a row conversion function returns null
+const joinOrSkip = (...fields) => (fields.includes(undefined) ? null : fields.join(','));
+const rowConverters = {
+    imdb: row => joinOrSkip(row['Your Rating'], row.Const),
+    rym: row => joinOrSkip(row.Rating, row.Title),
+    // .csv exported from Criticker have spaces between column names
+    criticker: row => joinOrSkip(convertRating(+row.Score), row[' IMDB ID']),
 };
 
-const parseFile = (file, parser) => {
-    for (const line of file.split('\n')) {
-        const m = parser(line);
-        if (!m) continue;
-        ui.filmList.append(`${m.rating},${m.movie}\n`);
-    }
+const prepareImport = e => {
+    const isLegalParser = Boolean(rowConverters[e.target.value]); // in case of html-js mismatch
+    ui.fileImport.disabled = !isLegalParser;
 };
 
 const handleImport = e => {
+    const format = ui.importSel.value;
     const reader = new FileReader();
     reader.onload = event => {
-        const file = event.target.result;
-        const format = ui.importSel.value;
-        if (format === 'none') {
-            alert('Select importer and try again.');
-        } else if (parsers[format]) {
-            parseFile(file, parsers[format]);
-        }
+        const fileStr = event.target.result;
+        ui.filmList.value = d3.csvParse(fileStr, rowConverters[format]).join('\n');
     };
 
     const [file] = e.target.files;
@@ -239,6 +236,7 @@ const App = {
     run: () => {
         ui.regexp.value = App.manager.regex;
 
+        ui.importSel.addEventListener('change', prepareImport);
         ui.fileImport.addEventListener('change', handleImport);
 
         ui.radioList.addEventListener('change', () => {

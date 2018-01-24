@@ -7,15 +7,13 @@
 // @include        http://*imdb.com/list/*/edit?*
 // @require        https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
 // @icon           http://www.imdb.com/favicon.ico
-// @grant          GM_addStyle
-// @version        2.4.1
+// @version        3.0
 // ==/UserScript==
 
 //
 // CHANGELOG
 //
 // 3.0
-// fixed: Enable on pages with a referal in the query string
 // fixed: Search by movie title
 // fixed: No longer requires jQuery; jquery-csv is replaced with d3-dsv
 // fixed: Remove delay before auto-clicking on a search result

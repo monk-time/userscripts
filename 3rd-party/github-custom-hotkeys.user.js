@@ -9,8 +9,8 @@
 // @include     https://*.github.com/*
 // @run-at      document-idle
 // @icon        https://assets-cdn.github.com/pinned-octocat.svg
-// @updateURL   https://raw.githubusercontent.com/Mottie/GitHub-userscripts/master/github-custom-hotkeys.user.js
-// @downloadURL https://raw.githubusercontent.com/Mottie/GitHub-userscripts/master/github-custom-hotkeys.user.js
+// @updateURL   https://raw.githubusercontent.com/monk-time/userscripts/master/3rd-party/github-custom-hotkeys.user.js
+// @downloadURL https://raw.githubusercontent.com/monk-time/userscripts/master/3rd-party/github-custom-hotkeys.user.js
 // ==/UserScript==
 (() => {
 	"use strict";

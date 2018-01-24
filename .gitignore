@@ -3,5 +3,6 @@
 
 iCheckMovies_Enhanced/
 *.json
+*.csv
 *.txt
 Temp.user.js

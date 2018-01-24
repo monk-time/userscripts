@@ -1,14 +1,17 @@
 ﻿// ==UserScript==
 // @name        GitHub Custom Hotkeys
-// @version     1.0.9
+// @version     1.0.10
 // @description A userscript that allows you to add custom GitHub keyboard hotkeys
 // @license     MIT
-// @author      Rob Garrison, monk-time (fix for GM4)
+// @author      Rob Garrison
 // @namespace   https://github.com/Mottie
 // @include     https://github.com/*
 // @include     https://*.github.com/*
 // @run-at      document-idle
-// @icon        https://github.com/fluidicon.png
+// @grant       GM_addStyle
+// @grant       GM_getValue
+// @grant       GM_setValue
+// @icon        https://assets-cdn.github.com/pinned-octocat.svg
 // @updateURL   https://raw.githubusercontent.com/Mottie/GitHub-userscripts/master/github-custom-hotkeys.user.js
 // @downloadURL https://raw.githubusercontent.com/Mottie/GitHub-userscripts/master/github-custom-hotkeys.user.js
 // ==/UserScript==
@@ -33,17 +36,12 @@
 		]
 	}
 	*/
-	let data = localStorage.getItem("github-hotkeys");
-	if (data === null) {
-		data = {
+	let data = GM_getValue("github-hotkeys", {
 			all: [{
 				f1: "#hotkey-settings"
 			}]
-		};
-	} else {
-		data = JSON.parse(data);
-	}
-	let lastHref = window.location.href;
+		}),
+		lastHref = window.location.href;
 
 	const openHash = "#hotkey-settings",
 
@@ -224,7 +222,7 @@
 	}
 
 	function addMenu() {
-		document.head.insertAdjacentHTML('beforeend', `<style>
+		GM_addStyle(`
 			#ghch-open-menu { cursor:pointer; }
 			#ghch-menu { position:fixed; z-index: 65535; top:0; bottom:0; left:0; right:0; opacity:0; visibility:hidden; }
 			#ghch-menu.ghch-open { opacity:1; visibility:visible; background:rgba(0,0,0,.5); }
@@ -243,7 +241,7 @@
 			.ghch-menu-inner li .ghch-remove:hover, .ghch-menu-inner legend .ghch-remove:hover { color:#800; }
 			.ghch-json-code { display:none; font-family:Menlo, Inconsolata, 'Droid Mono', monospace; font-size:1em; }
 			.ghch-json-code.ghch-open { position:absolute; top:37px; bottom:0; left:2px; right:2px; z-index:0; width:396px; max-width:396px; max-height:calc(100% - 37px); display:block; }
-		</style>`);
+		`);
 
 		// add menu
 		let menu = document.createElement("div");
@@ -376,7 +374,7 @@
 				}
 			}
 		}
-		localStorage.setItem("github-hotkeys", JSON.stringify(data));
+		GM_setValue("github-hotkeys", data);
 		debug("Data refreshed", data);
 	}
 

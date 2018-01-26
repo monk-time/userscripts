@@ -7,11 +7,16 @@
 // @include        http://*imdb.com/list/*/edit?*
 // @require        https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
 // @icon           http://www.imdb.com/favicon.ico
-// @version        3.0
+// @version        3.0.1
 // ==/UserScript==
 
 //
 // CHANGELOG
+//
+// 3.0.1
+// fixed: New IMDb search results layout
+// changed: Search only for regex matches by default
+// added: A checkbox to toggle search mode (matches only vs. matches or full string)
 //
 // 3.0
 // fixed: Search by movie title
@@ -22,8 +27,8 @@
 // changed: If the regex fails, try searching for the whole string
 //
 // 2.4.1
-// bugfix: In some instances the script wasn't loaded (bad @include)
-// change: Limit number of setTimeOut calls
+// fixed: In some instances the script wasn't loaded (bad @include)
+// changed: Limit number of setTimeOut calls
 //
 // 2.4.0
 // fixed: IMDb changed layout
@@ -67,6 +72,10 @@ document.head.insertAdjacentHTML('beforeend', `<style>
         border: 1px solid #e8e8e8;
     }
 
+    #ilh-ui div {
+        margin: 0.5em 0 0.75em
+    }
+
     #ilh-ui label {
         font-weight: normal;
     }
@@ -94,27 +103,33 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 
 const uiHTML = `
     <div id="ilh-ui">
-        <p>
-            <b>Import mode:</b>
+        <div>
+            <span>Import mode:</span>
             <label>
                 <input type="radio" name="importmode" value="list" checked>List</input>
             </label>
             <label>
                 <input type="radio" name="importmode" value="ratings">Ratings</input>
             </label>
-        </p>
+        </div>
         <textarea id="ilh-film-list" rows="7" cols="60" placeholder="Input titles or IMDb IDs and click Start"></textarea>
-        <br>
-        <input type="button" value="Start" id="ilh-start">
-        <input type="button" value="Skip"  id="ilh-skip">
-        <input type="button" value="Retry" id="ilh-retry">
-        <span>Remaining: <span id="ilh-films-remaining">0</span></span>
-        <br><br>
-        <span>Current: <input type="text" id="ilh-current-film" size="65""></span>
-        <br>
-        <span>Regexp (matches only): <input type="text" id="ilh-regexp" size="65"></span>
-        <br>
-        <p id="ilh-import" style="display: none">
+        <div>
+            <input type="button" value="Start" id="ilh-start">
+            <input type="button" value="Skip"  id="ilh-skip">
+            <input type="button" value="Retry" id="ilh-retry">
+            <span>Remaining: <span id="ilh-films-remaining">0</span></span>
+        </div>
+        <div>
+            <span>Current:</span>
+            <input type="text" id="ilh-current-film" size="65"">
+        </div>
+        <div>
+            <span>Regexp:</span>
+            <input type="checkbox" id="ilh-matches-only" checked>
+            <label for="ilh-matches-only">matches only  (disable to search for film titles)</label>
+            <input type="text" id="ilh-regexp" size="65">
+        </div>
+        <div id="ilh-import" style="display: none">
             <b>Import .csv from:</b>
             <select name="import" id="ilh-import-sel">
                 <option value="" selected disabled hidden>Select</option>
@@ -122,9 +137,9 @@ const uiHTML = `
                 <option value="rym">RateYourMusic</option>
                 <option value="criticker">Criticker</option>
             </select>
-            <b>File:</b>
+            <span>File:</span>
             <input type="file" id="ilh-file-import" disabled>
-        </p>
+        </div>
     </div>`;
 
 document.querySelector('div.lister-search').insertAdjacentHTML('afterend', uiHTML);
@@ -137,6 +152,7 @@ const innerIDs = [
     'films-remaining',
     'current-film',
     'regexp',
+    'matches-only',
     'import',
     'import-sel',
     'file-import',
@@ -298,9 +314,11 @@ const App = {
         ui.filmList.value = App.films.join('\n');
 
         // Run regex if it matches and let the manager process the result.
-        // Otherwise try searching for the whole line before skipping it.
-        // eslint-disable-next-line no-sparse-arrays
-        const result = App.regexObj.exec(filmTitle) || [, filmTitle];
+        // Otherwise, if "matches only" is unchecked,
+        // try searching for the whole line (if it's not empty) before skipping it.
+        const result = App.regexObj.exec(filmTitle) ||
+            // eslint-disable-next-line no-sparse-arrays
+            (!ui.matchesOnly.checked && filmTitle && [, filmTitle]);
         if (result) {
             App.manager.processRegexMatch(result, filmTitle2 => {
                 // Set imdb search input field to film title and trigger search

@@ -315,8 +315,8 @@ const App = {
 
 // Handle clicks on search results by a user or the script
 elIMDbResults.addEventListener('click', e => {
-    const imdbID = e.target.dataset.const;
-    if (!imdbID.startsWith('tt')) return;
+    const imdbID = e.target.closest('a').dataset.const;
+    if (!imdbID || !imdbID.startsWith('tt')) return;
     App.manager.handleSelection(imdbID, () => {
         setTimeout(() => App.handleNext(), REQUEST_DELAY);
     });

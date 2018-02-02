@@ -102,6 +102,22 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     }
 </style>`);
 
+const searchModeHints = {
+    auto:   'Input titles, IMDb URLs or IDs here and click Start. ' +
+            'If a line has an IMDb ID, it\'ll be auto-added to the list. ' +
+            'Otherwise the whole line will be searched for, ' +
+            'and you\'ll have to select the correct title manually.',
+    imdbid: 'Input text containing IMDb IDs here and click Start. ' +
+            'IMDb IDs are extracted from lines (only one per line) and ' +
+            'auto-added to the list, skipping the rest.',
+    line:   'Input titles or IMDb IDs here and click Start. ' +
+            'Whole lines are used for search, nothing is skipped.',
+    regexp: 'Input text here and click Start. Only captured groups of regex matches ' +
+            'are used for search.',
+    rating: 'Use the controls below to load data from a file or input text here and click Start. ' +
+            'Your rating and IMDb ID/title is extracted from each line with regex.',
+};
+
 const uiHTML = `
     <div id="ilh-ui">
         <div class="ilh-block">
@@ -111,7 +127,7 @@ const uiHTML = `
             <input type="radio" id="ilh-mode-ratings" name="mode" value="ratings">
             <label for="ilh-mode-ratings">Ratings</label>
         </div>
-        <textarea id="ilh-film-list" rows="7" cols="60" placeholder="Input titles or IMDb IDs and click Start"></textarea>
+        <textarea id="ilh-film-list" rows="7" placeholder="${searchModeHints.auto}"></textarea>
         <div>
             <input type="button" value="Start" id="ilh-start">
             <input type="button" value="Skip"  id="ilh-skip">
@@ -276,6 +292,7 @@ const App = {
 
         ui.searchMode.addEventListener('change', () => {
             ui.regexpBox.style.display = ui.searchMode.value === 'regexp' ? '' : 'none';
+            ui.filmList.placeholder = searchModeHints[ui.searchMode.value];
         });
 
         ui.modeList.addEventListener('change', () => {
@@ -284,6 +301,7 @@ const App = {
             ui.regexp.value = App.manager.regex.source;
             ui.regexpBox.style.display = ui.searchMode.value === 'regexp' ? '' : 'none';
             ui.searchModeBox.style.display = '';
+            ui.filmList.placeholder = searchModeHints[ui.searchMode.value];
         });
 
         ui.modeRatings.addEventListener('change', () => {
@@ -292,6 +310,7 @@ const App = {
             ui.regexp.value = App.manager.regex.source;
             ui.regexpBox.style.display = '';
             ui.searchModeBox.style.display = 'none';
+            ui.filmList.placeholder = searchModeHints.rating;
         });
 
         ui.start.addEventListener('click', () => {

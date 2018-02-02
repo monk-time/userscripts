@@ -277,13 +277,13 @@ const App = {
             App.handleNext();
         });
 
-        // when skip button is clicked
-        ui.skip.addEventListener('click', () => App.handleNext());
+        // When the search popup loses focus, IMDb will hide it after 300 ms,
+        // so all button clicks that want to keep it visible need to be delayed
+        ui.skip.addEventListener('click', () =>
+            setTimeout(() => App.handleNext(), 350));
 
-        // Sometimes the request fails forcing the user to skip an entry to continue
-        ui.retry.addEventListener('click', () => {
-            elIMDbSearch.dispatchEvent(new Event('keydown'));
-        });
+        ui.retry.addEventListener('click', () =>
+            setTimeout(() => elIMDbSearch.dispatchEvent(new Event('keydown')), 350));
     },
     handleNext: () => {
         if (App.films.length) {

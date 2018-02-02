@@ -78,16 +78,12 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 
     #ilh-ui label {
         font-weight: normal;
+        margin-right: 6px;
     }
 
-    #ilh-ui input[type=text] {
-        width: 100%;
-        font-family: monospace;
-    }
-
-    #ilh-ui #ilh-regexp {
-        margin-top: 4px;
-        margin-left: 1px;
+    #ilh-ui span,
+    #ilh-ui label:first-child {
+        font-weight: bold;
     }
 
     #ilh-ui textarea {
@@ -96,21 +92,24 @@ document.head.insertAdjacentHTML('beforeend', `<style>
         overflow: auto;
     }
 
-    #ilh-ui span {
-        font-weight: bold;
+    #ilh-ui .ilh-block {
+        display: flex;
+    }
+
+    #ilh-ui .ilh-block input[type=text] {
+        font-family: monospace;
+        flex-grow: 1;
     }
 </style>`);
 
 const uiHTML = `
     <div id="ilh-ui">
-        <div>
-            <span>Import mode:</span>
-            <label>
-                <input type="radio" name="importmode" value="list" checked>List</input>
-            </label>
-            <label>
-                <input type="radio" name="importmode" value="ratings">Ratings</input>
-            </label>
+        <div class="ilh-block">
+            <label>Import mode:</label>
+            <input type="radio" id="ilh-mode-list" name="mode" value="list" checked>
+            <label for="ilh-mode-list">List</label>
+            <input type="radio" id="ilh-mode-ratings" name="mode" value="ratings">
+            <label for="ilh-mode-ratings">Ratings</label>
         </div>
         <textarea id="ilh-film-list" rows="7" cols="60" placeholder="Input titles or IMDb IDs and click Start"></textarea>
         <div>
@@ -119,18 +118,25 @@ const uiHTML = `
             <input type="button" value="Retry" id="ilh-retry">
             <span>Remaining: <span id="ilh-films-remaining">0</span></span>
         </div>
-        <div>
-            <span>Current:</span>
-            <input type="text" id="ilh-current-film" size="65"">
+        <div class="ilh-block">
+            <label for="ilh-current-film">Current:</label>
+            <input type="text" id="ilh-current-film">
         </div>
-        <div>
-            <span>Regexp:</span>
-            <input type="checkbox" id="ilh-matches-only" checked>
-            <label for="ilh-matches-only">matches only  (disable to search for film titles)</label>
-            <input type="text" id="ilh-regexp" size="65">
+        <div class="ilh-block" id="ilh-regexp-box" style="display: none">
+            <label for="ilh-regexp">Regexp:</label>
+            <input type="text" id="ilh-regexp">
+        </div>
+        <div id="ilh-search-mode-box">
+            <label for="ilh-search-mode">Search mode:</label>
+            <select name="searchmode" id="ilh-search-mode">
+                <option value="auto" selected>Auto</option>
+                <option value="imdbid">IMDb IDs</option>
+                <option value="line">Line</option>
+                <option value="regexp">Regexp</option>
+            </select>
         </div>
         <div id="ilh-import" style="display: none">
-            <b>Import .csv from:</b>
+            <label for="ilh-import-sel">Import .csv from:</label>
             <select name="import" id="ilh-import-sel">
                 <option value="" selected disabled hidden>Select</option>
                 <option value="imdb">IMDb</option>
@@ -145,14 +151,18 @@ const uiHTML = `
 document.querySelector('div.lister-search').insertAdjacentHTML('afterend', uiHTML);
 
 const innerIDs = [
+    'mode-list',
+    'mode-ratings',
     'film-list',
     'start',
     'skip',
     'retry',
     'films-remaining',
     'current-film',
+    'search-mode-box',
+    'search-mode',
+    'regexp-box',
     'regexp',
-    'matches-only',
     'import',
     'import-sel',
     'file-import',
@@ -165,7 +175,7 @@ const ui = Object.assign(...innerIDs.map(id => ({
     [camelCase(id)]: document.getElementById(`ilh-${id}`),
 })));
 
-[ui.radioList, ui.radioRatings] = document.querySelectorAll('#ilh-ui input[name=importmode]');
+ui.freezables = [ui.modeList, ui.modeRatings, ui.filmList, ui.start, ui.regexp, ui.searchMode];
 const elIMDbSearch = document.getElementById('add-to-list-search');
 const elIMDbResults = document.getElementById('add-to-list-search-results');
 
@@ -200,13 +210,14 @@ const handleImport = e => {
 
 const RatingManager = {
     rating: 0,
-    regex: '^([1-9]|10),(.*)$',
-    processRegexMatch: ([, rating, filmTitle], callback) => {
+    regex: /^([1-9]|10),(.*)$/i,
+    match: (line, mode, regex) => regex.exec(line),
+    processMatch: ([, rating, filmTitle], callback) => {
         RatingManager.rating = rating;
         callback(filmTitle);
     },
-    handleSelection: async (imdbID, callback) => {
-        console.log(`RatingManager::handleSelection: Rating ${imdbID}`);
+    afterClick: async (imdbID, callback) => {
+        console.log(`RatingManager::afterClick: Rating ${imdbID}`);
         const moviePage = await fetch(
             `http://www.imdb.com/title/${imdbID}/`,
             { credentials: 'same-origin' },
@@ -238,9 +249,18 @@ const RatingManager = {
 };
 
 const ListManager = {
-    regex: '((?:tt|nm)\\d+)',
-    processRegexMatch: ([, filmTitle], callback) => callback(filmTitle),
-    handleSelection: (imdbID, callback) => callback(),
+    regex: /((?:tt|nm)\d+)/i, // IMDb IDs
+    match: (line, mode, regex) => ({
+        /* eslint-disable no-sparse-arrays */
+        // 'auto' - search for an id (if a string has one) or for a full non-empty string
+        auto:   s => ListManager.regex.exec(s) || s && [, s],
+        imdbid: s => ListManager.regex.exec(s),
+        line:   s => s && [, s],
+        regexp: s => regex.exec(s),
+        /* eslint-enable no-sparse-arrays */
+    })[mode](line),
+    processMatch: ([, filmTitle], callback) => callback(filmTitle),
+    afterClick: (imdbID, callback) => callback(),
 };
 
 const App = {
@@ -248,30 +268,40 @@ const App = {
     films: [],
     regexObj: null,
     run: () => {
-        ui.regexp.value = App.manager.regex;
+        // Set the default value for the 'Regexp' mode
+        ui.regexp.value = App.manager.regex.source;
 
         ui.importSel.addEventListener('change', prepareImport);
         ui.fileImport.addEventListener('change', handleImport);
 
-        ui.radioList.addEventListener('change', () => {
+        ui.searchMode.addEventListener('change', () => {
+            ui.regexpBox.style.display = ui.searchMode.value === 'regexp' ? '' : 'none';
+        });
+
+        ui.modeList.addEventListener('change', () => {
             App.manager = ListManager;
             ui.import.style.display = 'none';
-            ui.regexp.value = App.manager.regex;
+            ui.regexp.value = App.manager.regex.source;
+            ui.regexpBox.style.display = ui.searchMode.value === 'regexp' ? '' : 'none';
+            ui.searchModeBox.style.display = '';
         });
 
-        ui.radioRatings.addEventListener('change', () => {
+        ui.modeRatings.addEventListener('change', () => {
             App.manager = RatingManager;
-            ui.import.style.display = 'block';
-            ui.regexp.value = App.manager.regex;
+            ui.import.style.display = '';
+            ui.regexp.value = App.manager.regex.source;
+            ui.regexpBox.style.display = '';
+            ui.searchModeBox.style.display = 'none';
         });
 
-        // When start button is clicked
         ui.start.addEventListener('click', () => {
-            App.regexObj = RegExp(ui.regexp.value || App.manager.regex, 'i');
+            // This will be used only for ListManager's 'regexp' mode or RatingManager
+            App.regexObj = new RegExp(ui.regexp.value, 'i');
 
             // Disable relevant UI elements
-            [ui.filmList, ui.start, ui.regexp, ui.radioList, ui.radioRatings]
-                .forEach(el => { el.disabled = true; });
+            ui.freezables.forEach(el => {
+                el.disabled = true;
+            });
 
             App.films = ui.filmList.value.trim().split('\n');
             App.handleNext();
@@ -296,33 +326,24 @@ const App = {
         App.films = [];
         App.regexObj = null;
 
-        [ui.filmList, ui.start, ui.regexp, ui.radioList, ui.radioRatings]
-            .forEach(el => { el.disabled = false; });
+        ui.freezables.forEach(el => {
+            el.disabled = false;
+        });
 
         ui.currentFilm.value = '';
         elIMDbSearch.value = '';
     },
-    search: filmTitle => {
-        // Remove unnecessary whitespace
-        filmTitle = filmTitle.trim();
-
-        // Set current text to what we're searching
-        ui.currentFilm.value = filmTitle;
-
-        // Remove the first title from the text box and set the remaining number
+    search: line => {
+        line = line.trim();
+        ui.currentFilm.value = line;
         ui.filmsRemaining.textContent = App.films.length;
         ui.filmList.value = App.films.join('\n');
 
-        // Run regex if it matches and let the manager process the result.
-        // Otherwise, if "matches only" is unchecked,
-        // try searching for the whole line (if it's not empty) before skipping it.
-        const result = App.regexObj.exec(filmTitle) ||
-            // eslint-disable-next-line no-sparse-arrays
-            (!ui.matchesOnly.checked && filmTitle && [, filmTitle]);
+        const result = App.manager.match(line, ui.searchMode.value, App.regexObj);
         if (result) {
-            App.manager.processRegexMatch(result, filmTitle2 => {
+            App.manager.processMatch(result, filmTitle => {
                 // Set imdb search input field to film title and trigger search
-                elIMDbSearch.value = filmTitle2;
+                elIMDbSearch.value = filmTitle;
                 elIMDbSearch.dispatchEvent(new Event('keydown'));
             });
         } else {
@@ -335,7 +356,7 @@ const App = {
 elIMDbResults.addEventListener('click', e => {
     const imdbID = e.target.closest('a').dataset.const;
     if (!imdbID || !imdbID.startsWith('tt')) return;
-    App.manager.handleSelection(imdbID, () => {
+    App.manager.afterClick(imdbID, () => {
         setTimeout(() => App.handleNext(), REQUEST_DELAY);
     });
 });

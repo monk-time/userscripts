@@ -7,11 +7,16 @@
 // @include        http://*imdb.com/list/*/edit?*
 // @require        https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
 // @icon           http://www.imdb.com/favicon.ico
-// @version        3.0.1
+// @version        3.1
 // ==/UserScript==
 
 //
 // CHANGELOG
+//
+// 3.1
+// fixed: 'Skip/retry' buttons failed to keep search results visible
+// changed: The script searches for both IDs or titles by default again
+// added: A more granular control for what is used for search
 //
 // 3.0.1
 // fixed: New IMDb search results layout

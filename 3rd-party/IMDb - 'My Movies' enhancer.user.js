@@ -111,7 +111,6 @@
 
 // TODO: test in Chrome
 // TODO: check if the html returned instead of csv contains csv header
-// TODO: list export format has changed? investigate
 
 /* global d3 */
 
@@ -364,11 +363,10 @@ const parseMyLists = () => {
         .filter(x => x.name);
 
     // Get all other lists names in this page (should work only on imdb.com/user/xxx/lists)
-    const customLists = [...document.querySelectorAll('.lists td.name')]
-        // Lists can be about Titles, People, Characters & Images
-        .filter(el => el.textContent.includes(' Titles)'))
-        .map(({ children: [link] }) => {
-            const id = link.href.match(/\/list\/([^/?]+)\/?/)[1];
+    const customLists = [...document.querySelector('.user-lists').children]
+    // Lists can be about Titles, People, Characters & Images
+        .filter(el => el.dataset.listType === 'Titles')
+        .map(({ id, children: [link] }) => {
             const name = link.text;
             // If custom priority for defaultList is missing, set the lowest priority
             const { rank = defaultColors.length, color } =
@@ -418,6 +416,11 @@ const downloadLists = async () => {
     const tasks = userData.lists.map(async (list, i) => {
         // Firing all requests at once seems to cause erroneous responses from the server
         await sleep(delayBetweenRequests * i);
+        // Exporting the watchlist requires the ID that is only available on its page
+        if (list.id === 'watchlist') {
+            list = { name: list.name, id: await getWatchlistID(userID) };
+        }
+
         // For some reason sometimes IMDb returns HTML instead of an exported list
         const movieList = await retryWithDelay(3, 1000, () => downloadList(list, userID));
         progressBar.update();
@@ -434,9 +437,18 @@ const downloadLists = async () => {
     }
 };
 
+const getWatchlistID = async userID => {
+    const url = `http://www.imdb.com/user/${userID}/watchlist`;
+    const r = await fetch(url, { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const match = (await r.text()).match(/<meta property="pageId" content="(ls\d+)"/);
+    if (!match) throw new Error("Can't find the id of the watchlist");
+    return match[1];
+};
+
 // Download a list
 const downloadList = async ({ id, name }, userID) => {
-    const exportURL = `http://${window.location.host}/list/export?list_id=${id}&author_id=${userID}`;
+    const exportURL = `http://www.imdb.com/list/export?list_id=${id}&author_id=${userID}`;
     try {
         const r = await fetch(exportURL, { credentials: 'same-origin' });
         if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);

@@ -23,6 +23,7 @@
 // @exclude       http://*imdb.com/images/*
 // @exclude       http://*imdb.com/list/export*
 // @exclude       http://*imdb.com/eyeblaster/*
+// @require       https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
 // @icon          http://www.imdb.com/favicon.ico
 // @version       2.0
 // ==/UserScript==
@@ -111,6 +112,8 @@
 // TODO: test in Chrome
 // TODO: check if the html returned instead of csv contains csv header
 // TODO: list export format has changed? investigate
+
+/* global d3 */
 
 'use strict';
 
@@ -446,25 +449,17 @@ const downloadList = async ({ id, name }, userID) => {
 
 // Process a downloaded list; returns a sparse array
 const parseExportedList = csv => {
-    if (!csv.startsWith('"position","const",')) {
+    if (!csv.startsWith('Position,') && !csv.startsWith('Const,')) {
         throw new Error("The server didn't return a valid csv");
     }
 
-    return csv.trim().split('\n').slice(1).map(line => {
-        // CSV structure:
-        // 00: position    | 06: Title type     | 12:Genres
-        // 01: const       | 07: Directors      | 13:Num. Votes
-        // 02: created     | 08: You rated      | 14:Release Date (month/day/year)
-        // 03: modified    | 09: IMDb Rating    | 15:URL
-        // 04: description | 10: Runtime (mins) |
-        // 05: Title       | 11: Year           |
-        const fields = line.split('","');
-        if (line.length < 50 || fields.length !== 16 || !fields[1].startsWith('tt')) {
-            throw new Error(`Got malformed line in csv: ${line}`);
+    return d3.csvParse(csv, row => {
+        if (!row.Const.startsWith('tt')) {
+            throw new Error(`Got a malformed row in csv: ${JSON.stringify(row)}`);
         }
 
-        const mID = encodeID(fields[1].substr(2));
-        const [m, i] = fields.slice(8, 10).map(parseFloat);
+        const mID = encodeID(row.Const.slice(2));
+        const [m, i] = [row['Your Rating'], row['IMDb Rating']].map(parseFloat);
         // Store ratings only if they are set (both can be missing)
         return { mID, ratings: { ...m && { m }, ...i && { i } } };
     });

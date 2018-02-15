@@ -576,8 +576,8 @@ const formMovieListsHTML = mID => {
 // ------- Buttons -------
 
 const addButtons = reverseLists => {
-    const h2 = document.getElementsByTagName('h2');
-    if (!h2) {
+    const h1 = document.getElementsByTagName('h1');
+    if (!h1.length) {
         console.log('Could not find the "main" div to insert buttons!');
         return;
     }
@@ -587,7 +587,7 @@ const addButtons = reverseLists => {
     const buttons = [btnRefresh, btnClear, btnSort(reverseLists), btnHelp]
         .map(createButton);
     div.append(...buttons);
-    h2[0].appendChild(div);
+    h1[0].appendChild(div);
 };
 
 const createButton = ({ text, help, trigger }) => {
@@ -666,7 +666,6 @@ let userData = { lists: [], movies: {} };
 if (window.location.href.match(/\.imdb\.com\/user\/[^/]+\/lists/)) {
     // Allow user to manually update his/her list of movies
     addButtons(reverseLists);
-    // Nothing else to do on the lists page - goodbye!
 } else {
     // Load movie data for this user from localStorage
     userData = loadUserData() || userData;

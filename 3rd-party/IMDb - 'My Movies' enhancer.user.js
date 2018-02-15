@@ -18,14 +18,16 @@
 // @license       GPL v3; http://www.gnu.org/copyleft/gpl.html
 // @author        Ricardo, monk-time
 // @include       http://*.imdb.com/*
+// @include       https://*.imdb.com/*
 // @match         http://*.imdb.com/*
+// @match         https://*.imdb.com/*
 // @exclude       http://i.imdb.com/*
-// @exclude       http://*imdb.com/images/*
-// @exclude       http://*imdb.com/list/export*
-// @exclude       http://*imdb.com/eyeblaster/*
+// @exclude       https://i.imdb.com/*
+// @exclude       http://*.imdb.com/images/*
+// @exclude       https://*.imdb.com/images/*
 // @require       https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
 // @icon          http://www.imdb.com/favicon.ico
-// @version       2.0
+// @version       2.1
 // ==/UserScript==
 //
 // --------------------------------------------------------------------
@@ -46,6 +48,7 @@
 //
 // History:
 // --------
+// 2018.02.15  [2.1]  New IMDb layout, more reliable parsing of CSV, support for https
 // 2017.11.31  [2.0]  A full rewrite in modern JS (ES6+).
 //                    Added a flexible system of custom list priorities.
 //                    The script now retries exporting a list if IMDb returns garbage instead of csv

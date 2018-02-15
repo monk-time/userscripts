@@ -8,9 +8,10 @@
 // @homepageURL   https://openuserjs.org/scripts/monk-time/IMDb_-_Clutter-less
 // @updateURL     https://openuserjs.org/meta/monk-time/IMDb_-_Clutter-less.meta.js
 // @include       http://*.imdb.com/*
+// @include       https://*.imdb.com/*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
 // @icon          http://www.imdb.com/favicon.ico
-// @version       1.0.1
+// @version       1.0.2
 // ==/UserScript==
 
 'use strict';

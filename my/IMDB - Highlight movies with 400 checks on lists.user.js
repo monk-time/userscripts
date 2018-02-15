@@ -8,17 +8,19 @@
 // @homepageURL   https://openuserjs.org/scripts/monk-time/IMDB_-_Highlight_movies_with_400_checks_on_lists
 // @updateURL     https://openuserjs.org/meta/monk-time/IMDB_-_Highlight_movies_with_400_checks_on_lists.meta.js
 // @include       http://*.imdb.com/list/*
+// @include       https://*.imdb.com/list/*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
 // @icon          http://www.imdb.com/favicon.ico
 // @grant         GM_xmlhttpRequest
 // @grant         GM.xmlHttpRequest
 // @connect       icheckmovies.com
-// @version       1.3
+// @version       1.3.1
 // ==/UserScript==
 
 /* Changelog:
  * 2017.09.01  [1.2]: YQL no longer works, switched to GM_xmlhttpRequest for cross-origin requests.
  * 2017.11.24  [1.3]: Fixed GM_xmlhttpRequest for GM4/other engines compatibility.
+ * 2018.15.02  [1.3.1]: Enabled on HTTPS pages.
  */
 
 'use strict';

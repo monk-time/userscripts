@@ -2,7 +2,7 @@
 // @name          IMDb - Shorten and color credits
 // @namespace     monk-time
 // @author        monk-time
-// @include       /http://.*imdb\.com/name/nm\d+/(\?ref)?/
+// @include       /https?://.*imdb\.com/name/nm\d+/(\?ref)?/
 // @icon          http://www.imdb.com/favicon.ico
 // ==/UserScript==
 

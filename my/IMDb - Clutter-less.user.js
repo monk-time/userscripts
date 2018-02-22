@@ -19,7 +19,7 @@
 const globalElements = {
     shareButton: '.titleOverviewShareButton',
     recommendations: '#titleRecs',
-    videosPhotos: '#titleMediaStrip [id^="combined-"]',
+    videosPhotos: '#titleVideoStrip, #titleImageStrip',
     castPhotos: '.cast_list .primary_photo',
     contribute: '.contribute',
     footer: '#footer',

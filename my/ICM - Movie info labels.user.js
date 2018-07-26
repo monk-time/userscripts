@@ -21,7 +21,7 @@
 // @exclude       https://www.icheckmovies.com/lists/disliked/*
 // @exclude       https://www.icheckmovies.com/lists/watchlist/*
 // @icon          https://www.icheckmovies.com/favicon.ico
-// @version       1.0.1
+// @version       1.0.2
 // ==/UserScript==
 
 /* Changelog:
@@ -29,6 +29,7 @@
  * 2017.09.31  [0.9.0]: Fixed formatting.
  * 2017.11.23  [1.0.0]: Removed jQuery dependency, fixed for GM4.
  * 2017.11.23  [1.0.1]: Chrome didn't render sorting arrows correctly.
+ * 2018.07.26  [1.0.2]: Fixed the watchlist page
  */
 
 // TODO: keep sorting arrows visible
@@ -51,7 +52,7 @@ const error = (msg, ...rest) => {
 
 const $ = (sel, context) => (context || document).querySelector(sel);
 const $$ = (sel, context) => [...(context || document).querySelectorAll(sel)];
-const getVisible = elements => [...elements].filter(el => el.style.display !== 'none');
+const getVisible = elements => [...elements].filter(el => el && el.style.display !== 'none');
 const reflect = promise => promise
     .then(val => ({ val, status: 'resolved' }))
     .catch(err => ({ err, status: 'rejected' }));

@@ -441,7 +441,7 @@ const downloadLists = async () => {
 };
 
 const getWatchlistID = async userID => {
-    const url = `http://www.imdb.com/user/${userID}/watchlist`;
+    const url = `https://www.imdb.com/user/${userID}/watchlist`;
     const r = await fetch(url, { credentials: 'same-origin' });
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
     const match = (await r.text()).match(/<meta property="pageId" content="(ls\d+)"/);
@@ -451,7 +451,7 @@ const getWatchlistID = async userID => {
 
 // Download a list
 const downloadList = async ({ id, name }, userID) => {
-    const exportURL = `http://www.imdb.com/list/export?list_id=${id}&author_id=${userID}`;
+    const exportURL = `https://www.imdb.com/list/export?list_id=${id}&author_id=${userID}`;
     try {
         const r = await fetch(exportURL, { credentials: 'same-origin' });
         if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);

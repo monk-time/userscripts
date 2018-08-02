@@ -24,7 +24,8 @@ const fetchHeadlines = async url => {
         .querySelectorAll('.index-news-item')]
         .map(extractHeadline)
         .filter(({ date }) => date.startsWith(`${today} `))
-        .map(item => ({ ...item, date: item.date.slice(-5) }));
+        .map(item => ({ ...item, date: item.date.slice(-5) }))
+        .reverse();
 };
 
 const extractHeadline = el => {

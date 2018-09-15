@@ -11,13 +11,14 @@
 // @include       https://*.imdb.com/*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
 // @icon          http://www.imdb.com/favicon.ico
-// @version       1.0.2
+// @version       1.0.3
 // ==/UserScript==
 
 'use strict';
 
 const globalElements = {
     shareButton: '.titleOverviewShareButton',
+    watchlistButton: '.wlb-title-main-details', // Redundant button below a title description
     recommendations: '#titleRecs',
     videosPhotos: '#titleVideoStrip, #titleImageStrip',
     castPhotos: '.cast_list .primary_photo',

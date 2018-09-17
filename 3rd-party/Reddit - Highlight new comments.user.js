@@ -5,19 +5,26 @@
 // @author         JonnyRobbie, monk-time
 // @include        /^https?:\/\/((www|[a-z]{2})\.)?reddit\.com\/r\/[a-zA-Z0-9_-]+\/comments\/[0-9a-z]+\/[^/]+\//
 // @icon           https://www.reddit.com/favicon.ico
-// @version        1.7
+// @version        1.8
 // ==/UserScript==
 
 'use strict';
 
 /* ------- SETTINGS ------- */
 
-const highlightColor = '#e5facc';
 const expirationDays = 14;
+const colors = {
+    main: '#e5facc',
+    // Special colors for comments made in the last N minutes.
+    // Order doesn't matter (will be sorted asc. later), the strictest rule takes priority.
+    // Leave the array empty to disable this feature.
+    recent: [[5, '#faf0cc'], [20, '#fafacc'], [60, '#effacc']],
+};
 
 /* ------- TIME UTILS ------- */
 
 const minsToMs = n => n * 60 * 1000;
+const msToMins = n => n / 1000 / 60;
 const daysToMins = n => n * 24 * 60;
 const padToTwo = n => `${n >= 0 && n < 10 ? '0' : ''}${n}`;
 
@@ -27,7 +34,7 @@ const humanDeltaToTime = ([hours, mins]) => Date.now() - minsToMs(hours * 60 + m
 // timestamp (ms) -> [hours, mins] ago from now
 const timeToHumanDelta = timestamp => {
     const deltaMs = Date.now() - timestamp;
-    const deltaMins = Math.floor(deltaMs / (1000 * 60));
+    const deltaMins = Math.floor(msToMins(deltaMs));
     return [Math.floor(deltaMins / 60), deltaMins % 60];
 };
 
@@ -43,13 +50,15 @@ const strToHumanDelta = hhmm => {
 
 /* ------- MAIN ------- */
 
-document.head.insertAdjacentHTML('beforeend', `
-    <style>
-        .entry.highlighted .usertext-body {
-            background-color: ${highlightColor};
-        }
-    </style>
-`);
+colors.recent.sort(([aLimit], [bLimit]) => aLimit - bLimit);
+const getCSSClassName = limit => (limit > 0 ? `highlight-${limit}` : 'highlight');
+const stylesByRecency = [[0, colors.main], ...colors.recent].map(([limit, color]) => `
+    .entry.${getCSSClassName(limit)} .usertext-body {
+        background-color: ${color};
+    }
+`).join('');
+
+document.head.insertAdjacentHTML('beforeend', `<style>${stylesByRecency}</style>`);
 
 const main = () => {
     purgeOldStorage(expirationDays);
@@ -130,8 +139,19 @@ const highlightComments = lastVisit => {
         const elTime = comment.querySelector('time');
         if (!elTime || !elTime.title) return;
         const timestamp = Date.parse(elTime.title);
-        comment.classList.toggle('highlighted', timestamp > lastVisit);
+        if (timestamp <= lastVisit) return;
+        const [hours, mins] = timeToHumanDelta(timestamp);
+        const deltaMins = hours * 60 + mins;
+        comment.classList.add(getCSSClassName(getLimit(deltaMins)));
     });
+};
+
+// Get the upper limit (in minutes) of the first matching rule
+// for a comment based on its recency.
+const getLimit = diffMins => {
+    // colors.recent is assumed to be sorted in ascending order
+    const firstMatch = colors.recent.find(([maxMins]) => maxMins >= diffMins);
+    return firstMatch ? firstMatch[0] : 0;
 };
 
 main();

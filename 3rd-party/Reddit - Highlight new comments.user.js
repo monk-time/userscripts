@@ -3,9 +3,9 @@
 // @description    Highlight new comments in a thread since your last visit
 // @namespace      monk-time
 // @author         JonnyRobbie, monk-time
-// @include        /^https?:\/\/((www|[a-z]{2})\.)?reddit\.com\/r\/[a-zA-Z0-9_-]+\/comments\/[0-9a-z]+\/[^/]+\//
+// @include        /^https?:\/\/([a-z]+\.)?reddit\.com\/r\/[a-zA-Z0-9_-]+\/comments\/[0-9a-z]+\/[^/]+\//
 // @icon           https://www.reddit.com/favicon.ico
-// @version        1.8
+// @version        1.8.1
 // ==/UserScript==
 
 'use strict';

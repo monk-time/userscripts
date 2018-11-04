@@ -4,8 +4,8 @@
 // @namespace      monk-time
 // @author         JonnyRobbie, monk-time
 // @include        /^https?:\/\/([a-z]+\.)?reddit\.com\/r\/[a-zA-Z0-9_-]+\/comments\/[0-9a-z]+\/[^/]+\//
-// @icon           https://www.reddit.com/favicon.ico
-// @version        1.8.1
+// @icon           https://www.redditstatic.com/desktop2x/img/favicon/favicon-16x16.png
+// @version        1.9
 // ==/UserScript==
 
 'use strict';

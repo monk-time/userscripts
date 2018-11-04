@@ -52,6 +52,7 @@ const strToHumanDelta = hhmm => {
 
 colors.recent.sort(([aLimit], [bLimit]) => aLimit - bLimit);
 const getCSSClassName = limit => (limit > 0 ? `highlight-${limit}` : 'highlight');
+const allCSSClassNames = [0, ...colors.recent.map(([limit]) => limit)].map(getCSSClassName);
 const stylesByRecency = [[0, colors.main], ...colors.recent].map(([limit, color]) => `
     .entry.${getCSSClassName(limit)} .usertext-body {
         background-color: ${color};
@@ -137,9 +138,15 @@ const highlightComments = lastVisit => {
     const comments = document.querySelectorAll('.comment > .entry');
     comments.forEach(comment => {
         const elTime = comment.querySelector('time');
+        // Skip removed comments
         if (!elTime || !elTime.title) return;
         const timestamp = Date.parse(elTime.title);
-        if (timestamp <= lastVisit) return;
+        // Skip older comments, removing the highlighting if necessary
+        if (timestamp <= lastVisit) {
+            comment.classList.remove(...allCSSClassNames);
+            return;
+        }
+
         const [hours, mins] = timeToHumanDelta(timestamp);
         const deltaMins = hours * 60 + mins;
         comment.classList.add(getCSSClassName(getLimit(deltaMins)));

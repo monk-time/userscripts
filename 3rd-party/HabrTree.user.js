@@ -6,6 +6,8 @@
 // @include        https://habrahabr.ru/company/*/blog/*
 // @include        https://geektimes.ru/post/*
 // @include        https://geektimes.ru/company/*/blog/*
+// @include        https://habr.com/*/post/*
+// @include        https://habr.com/company/*/blog/*
 // @require        https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
 // @icon           https://habrahabr.ru/favicon.ico
 // ==/UserScript==

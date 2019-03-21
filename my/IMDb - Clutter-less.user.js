@@ -23,6 +23,7 @@ const globalElements = {
     videosPhotos: '#titleVideoStrip, #titleImageStrip',
     castPhotos: '.cast_list .primary_photo',
     contribute: '.contribute',
+    recentlyViewed: '#rvi-div',
     footer: '#footer',
 };
 const sidebarBlocksGood = [

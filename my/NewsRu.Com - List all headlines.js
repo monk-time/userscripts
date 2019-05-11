@@ -103,7 +103,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
         line-height: 16px;
         background-color: #CFD1E2;
         border-radius: 20px;
-        padding: 5px 20px 2px 8px;
+        padding: 5px 20px 5px 8px;
         width: 550px;
         margin-bottom: 8px;
         margin-left: 5px;

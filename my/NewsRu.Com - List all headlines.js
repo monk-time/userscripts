@@ -99,7 +99,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
         padding: 5px 0;
     }
     .lah-section {
-        font-size: 12px;
+        font-size: 13px;
         line-height: 16px;
         background-color: #CFD1E2;
         border-radius: 20px;
@@ -113,7 +113,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     }
     .lah-section-label {
         text-align: center;
-        font-size: 13px;
+        font-size: 14px;
         grid-column-start: 1;
         grid-column-end: 3;
     }

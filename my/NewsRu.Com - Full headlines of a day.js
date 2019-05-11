@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        NewsRu.Com - Fetch all daily headlines
+// @name        NewsRu.Com - Full headlines of a day
 // @namespace   monk-time
 // @author      monk-time
 // @include     /^http://classic\.newsru\.com/main/\d+[a-z]+\d{4}/$/
@@ -45,5 +45,6 @@ const fillTemplate = ({ date, url, text }) => `
     </div>
 `;
 
-const sections = [...document.querySelectorAll('.sect-ttl')].slice(0, 3);
+const sections = [...document.querySelectorAll('.sect-ttl')].filter(el =>
+    el.querySelector('.top-corner-link').href.match(/\/(russia|world|finance)\//i));
 sections.forEach(replace);

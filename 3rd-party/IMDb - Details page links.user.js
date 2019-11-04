@@ -17,7 +17,6 @@
 const urlTemplates = [
     ['Refs', 'trivia?tab=mc', 'Connections'],
     ['Reviews', 'reviews?filter=best', 'User Reviews'],
-    ['(less) Reviews', 'reviews?filter=custom&vote_max=7', 'User Reviews'],
     ['FAQ', 'faq', 'FAQ'],
     ['Trivia', 'trivia', 'Trivia'],
     ['Board (ia)', 'https://filmboards.com/board/1{nottimdbid}/'],
@@ -36,7 +35,7 @@ const urlTemplates = [
     ['OpenSubtitles', 'https://www.opensubtitles.org/en/search2/sublanguageid-eng/subsumcd-1/imdbid-{imdbid}'],
     ['YouTube', 'https://www.youtube.com/results?search_query={title} {year}'],
     [],
-    ['Reddit', 'https://www.reddit.com/r/movies+truefilm/search?q={title}&restrict_sr=on&include_over_18=on&sort=comments&t=all'],
+    ['Reddit', 'https://www.reddit.com/r/gamerghazi+truefilm/search?q={title}&restrict_sr=on&include_over_18=on&sort=comments&t=all'],
     ['ФЭР', 'https://www.google.com/search?q=site:club443.ru %22{title}%22'],
     ['RottenTomatoes', 'https://www.rottentomatoes.com/search/?search={titlePlain}'],
     ['Letterboxd', 'https://letterboxd.com/search/films/{title}'],

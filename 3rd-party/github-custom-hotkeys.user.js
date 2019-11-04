@@ -1,6 +1,6 @@
 ﻿// ==UserScript==
 // @name        GitHub Custom Hotkeys
-// @version     1.0.10
+// @version     1.0.25
 // @description A userscript that allows you to add custom GitHub keyboard hotkeys
 // @license     MIT
 // @author      Rob Garrison, monk-time (fix for GM4)
@@ -8,7 +8,7 @@
 // @include     https://github.com/*
 // @include     https://*.github.com/*
 // @run-at      document-idle
-// @icon        https://assets-cdn.github.com/pinned-octocat.svg
+// @icon        https://github.githubassets.com/pinned-octocat.svg
 // @updateURL   https://raw.githubusercontent.com/monk-time/userscripts/master/3rd-party/github-custom-hotkeys.user.js
 // @downloadURL https://raw.githubusercontent.com/monk-time/userscripts/master/3rd-party/github-custom-hotkeys.user.js
 // ==/UserScript==
@@ -18,7 +18,7 @@
 	{
 		"all": [
 			{ "f1" : "#hotkey-settings" },
-			{ "g g": "{repo}/graphs" },
+			{ "g g": "{repo}/graphs/code-frequency" },
 			{ "g p": "{repo}/pulse" },
 			{ "g u": "{user}" },
 			{ "g s": "{upstream}" }
@@ -54,31 +54,53 @@
 		},
 
 		// https://github.com/{nonUser}
-		// see https://github.com/Mottie/github-reserved-names v1.0.6
+		// see https://github.com/Mottie/github-reserved-names
 		nonUser = new RegExp("^(" + [
+			/* BUILD:RESERVED-NAMES-START (v1.1.5) */
 			"400", "401", "402", "403", "404", "405", "406", "407", "408", "409",
 			"410", "411", "412", "413", "414", "415", "416", "417", "418", "419",
 			"420", "421", "422", "423", "424", "425", "426", "427", "428", "429",
 			"430", "431", "500", "501", "502", "503", "504", "505", "506", "507",
 			"508", "509", "510", "511", "about", "access", "account", "admin",
-			"anonymous", "api", "apps", "auth", "billing", "blog", "business", "c",
-			"cache", "categories", "changelog", "codereview", "comments", "community",
-			"compare", "contact", "dashboard", "design", "developer", "docs",
-			"downloads", "editor", "edu", "enterprise", "events", "explore",
-			"features", "files", "gist", "gists", "graphs", "help", "home", "hosting",
-			"images", "info", "integrations", "issues", "jobs", "join", "languages",
-			"legal", "linux", "lists", "login", "logout", "mac", "maintenance",
-			"marketplace", "mine", "mirrors", "mobile", "navigation", "network",
-			"new", "news", "notifications", "oauth", "offer", "open-source",
-			"organizations", "orgs", "pages", "payments", "personal", "plans",
-			"plugins", "popular", "posts", "press", "pricing", "projects", "pulls",
-			"readme", "releases", "repositories", "search", "security", "services",
-			"sessions", "settings", "shop", "showcases", "signin", "signup", "site",
-			"ssh", "staff", "stars", "static", "status", "store", "stories",
-			"styleguide", "subscriptions", "support", "talks", "teams", "terms",
-			"tos", "tour", "translations", "trending", "updates", "username", "users",
-			"w", "watching", "wiki", "windows", "works-with", "www1", "www2", "www3",
-			"www4", "www5", "www6", "www7", "www8", "www9"
+			"anonymous", "any", "api", "apps", "attributes", "auth", "billing",
+			"blob", "blog", "bounty", "branches", "business", "businesses", "c",
+			"cache", "case-studies", "categories", "central", "certification",
+			"changelog", "cla", "cloud", "codereview", "collection",
+			"collections", "comments", "commit", "commits", "community",
+			"companies", "compare", "contact", "contributing", "cookbook",
+			"coupons", "customer", "customers", "dashboard", "dashboards",
+			"design", "develop", "developer", "diff", "discover", "discussions",
+			"docs", "downloads", "downtime", "editor", "editors", "edu",
+			"enterprise", "events", "explore", "featured", "features", "files",
+			"fixtures", "forked", "garage", "ghost", "gist", "gists", "graphs",
+			"guide", "guides", "help", "help-wanted", "home", "hooks", "hosting",
+			"hovercards", "identity", "images", "inbox", "individual", "info",
+			"integration", "interfaces", "introduction", "investors", "issues",
+			"jobs", "join", "journal", "journals", "lab", "labs", "languages",
+			"launch", "layouts", "learn", "legal", "library", "linux", "listings",
+			"lists", "login", "logos", "logout", "mac", "maintenance", "malware",
+			"man", "marketplace", "mention", "mentioned", "mentioning",
+			"mentions", "migrating", "milestones", "mine", "mirrors", "mobile",
+			"navigation", "network", "new", "news", "none", "nonprofit",
+			"nonprofits", "notices", "notifications", "oauth", "offer",
+			"open-source", "organisations", "organizations", "orgs", "pages",
+			"partners", "payments", "personal", "plans", "plugins", "popular",
+			"popularity", "posts", "press", "pricing", "professional", "projects",
+			"pulls", "raw", "readme", "recommendations", "redeem", "releases",
+			"render", "reply", "repositories", "resources", "restore", "revert",
+			"save-net-neutrality", "saved", "scraping", "search", "security",
+			"services", "sessions", "settings", "shareholders", "shop",
+			"showcases", "signin", "signup", "site", "spam", "ssh", "staff",
+			"starred", "stars", "static", "status", "statuses", "storage",
+			"store", "stories", "styleguide", "subscriptions", "suggest",
+			"suggestion", "suggestions", "support", "suspended", "talks", "teach",
+			"teacher", "teachers", "teaching", "teams", "ten", "terms",
+			"timeline", "topic", "topics", "tos", "tour", "train", "training",
+			"translations", "tree", "trending", "updates", "username", "users",
+			"visualization", "w", "watching", "wiki", "windows", "works-with",
+			"www0", "www1", "www2", "www3", "www4", "www5", "www6", "www7",
+			"www8", "www9"
+			/* BUILD:RESERVED-NAMES-END */
 		].join("|") + ")$");
 
 	function getUrlParts() {
@@ -113,6 +135,16 @@
 		if (parts.t === "issues" || parts.t === "pulls") {
 			// issue number
 			parts.issue = tmp[4] || "";
+		}
+		// branch/tag?
+		if (parts.t === "tree" || parts.t === "blob") {
+			parts.branch = tmp[4] || "";
+		} else if (parts.t === "releases" && tmp[4] === "tag") {
+			parts.branch = tmp[5] || "";
+		}
+		// commit hash?
+		if (parts.t === "commit") {
+			parts.commit = tmp[4] || "";
 		}
 		// forked from
 		tmp = $(".repohead .fork-flag a");
@@ -233,7 +265,7 @@
 			.ghch-remove, .ghch-remove svg, #ghch-settings-inner .ghch-close svg { vertical-align:middle; cursor:pointer; }
 			.ghch-menu-inner { max-height:60vh; overflow-y:auto; }
 			.ghch-menu-inner ul { list-style:none; }
-			.ghch-menu-inner li { margin-bottom:4px; }
+			.ghch-menu-inner li { white-space:pre; margin-bottom:4px; }
 			.ghch-scope-all, .ghch-scope-add, .ghch-scope-custom { width:100%; border:2px solid rgba(85,85,85,0.5); border-radius:4px; padding:10px; margin:0; }
 			.ghch-scope-add, .ghch-hotkey-add { border:2px dashed #555; border-radius:4px; opacity:0.6; text-align:center; cursor:pointer; margin-top:10px; }
 			.ghch-scope-add:hover, .ghch-hotkey-add:hover { opacity:1;  }
@@ -281,7 +313,9 @@
 			.header .dropdown-item[href="/settings/profile"],
 			.header .dropdown-item[data-ga-click*="go to profile"],
 			.Header .dropdown-item[href="/settings/profile"],
-			.Header .dropdown-item[data-ga-click*="go to profile"]
+			.Header .dropdown-item[data-ga-click*="go to profile"],
+			.js-header-wrapper .dropdown-item[href="/settings/profile"],
+			.js-header-wrapper .dropdown-item[data-ga-click*="go to profile"]
 		`);
 		if (els.length) {
 			els[els.length - 1].parentNode.insertBefore(menu, els[els.length - 1].nextSibling);
@@ -440,7 +474,7 @@
 		});
 		// close JSON code textarea
 		tmp = $(".ghch-json-code", menu);
-		on(tmp, "focus", () => {
+		on(tmp, "focus", function () {
 			this.select();
 		});
 		on(tmp, "paste", () => {

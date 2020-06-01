@@ -2,7 +2,7 @@
 // @name        IMDb - Sort board threads
 // @namespace   monk-time
 // @author      monk-time
-// @include     https://filmboards.com/board/*
+// @include     https://moviechat.org/tt*
 // @icon        http://www.imdb.com/favicon.ico
 // ==/UserScript==
 
@@ -10,10 +10,27 @@
 
 const $$ = document.querySelectorAll.bind(document);
 const $ = document.querySelector.bind(document);
-const selThreads = '.thread.odd, .thread.even';
-const container = $('.threads');
+const baseURL = `${document.location}?page=`;
+const selThreads = '.thread-odd, .thread-even';
+const selPostNum = '.row > div:nth-child(3)';
+const selMaxPageNum = '.pagination :last-child a';
+const getPageLinks = () => {
+    const el = $(selMaxPageNum);
+    if (!(el && el.href && el.href.match(/\d+$/))) {
+        console.log('No other pages found');
+        return [];
+    }
 
-const getPostNum = thread => Number(thread.querySelector(':scope .replies a').textContent);
+    const maxPageNum = Number(el.href.match(/\d+$/)[0]);
+    console.log(`Total pages: ${maxPageNum}`);
+    return [...new Array(maxPageNum - 1)]
+        .map((_, i) => i + 2)
+        .map(i => `${baseURL}${i}`);
+};
+
+const container = $(selThreads).parentNode;
+
+const getPostNum = thread => Number(thread.querySelector(selPostNum).textContent);
 const sortAndAppend = threads => threads
     .sort((a, b) => getPostNum(b) - getPostNum(a))
     .forEach(el => container.appendChild(el));
@@ -25,22 +42,20 @@ const extractThreads = async url => {
 };
 
 const appendNextPages = () => {
-    const pagesLinks = [...$('.pagination').querySelectorAll('a:not(.current)')];
-    $$('.threads-meta').forEach(pageBar => pageBar.remove());
-    Promise.all(pagesLinks.map(page => extractThreads(page.href)))
+    Promise.all(getPageLinks().map(extractThreads))
         .then(results => {
             const fetched = [].concat(...results);
             sortAndAppend([...$$(selThreads), ...fetched]);
         });
 };
 
-sortAndAppend([...$$(selThreads)]);
-
-for (const link of $$('.new-topic > a')) {
-    link.href = '';
-    link.text = 'Append next pages';
-    link.addEventListener('click', e => {
-        e.preventDefault();
-        appendNextPages();
-    });
-}
+const link = $('#discover a');
+link.href = '';
+link.text = 'Sort and append next pages';
+link.addEventListener('click', e => {
+    e.preventDefault();
+    console.log('Button clicked');
+    $('.pagination').style.display = 'none';
+    sortAndAppend([...$$(selThreads)]);
+    appendNextPages();
+});

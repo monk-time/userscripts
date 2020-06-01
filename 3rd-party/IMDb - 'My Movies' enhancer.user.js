@@ -27,7 +27,7 @@
 // @exclude       https://*.imdb.com/images/*
 // @require       https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
 // @icon          http://www.imdb.com/favicon.ico
-// @version       2.1
+// @version       2.11
 // ==/UserScript==
 //
 // --------------------------------------------------------------------
@@ -324,7 +324,7 @@ const encodeID = numStr => parseInt(numStr, 10).toString(36);
 // Return name of user currently logged on IMDb (log on console if failed)
 const getCurrentUser = () => {
     const errorMsg = `${window.location.href}\nUser not logged in (or couldn't get user info)`;
-    const account = document.querySelector('#consumer_user_nav .navCategory > a[href*="/user/"]');
+    const account = document.querySelector('.navbar__user-menu-toggle__button');
     if (!account) throw new Error(errorMsg);
     const loggedIn = account.textContent.trim();
     if (!loggedIn) throw new Error(errorMsg);

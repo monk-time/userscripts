@@ -11,7 +11,7 @@
 
 // Empty arrays are separators, 2-sized are normal urls, 3-sized are inner urls
 // Available segments:
-//   {title}  {titlePlain} {titlePlused}
+//   {title}  {title_plain} {title_plused}
 //   {year}   {year_min}   {year_max}
 //   {imdbid} {nottimdbid}
 const urlTemplates = [
@@ -19,27 +19,26 @@ const urlTemplates = [
     ['Reviews', 'reviews?filter=best', 'User Reviews'],
     ['FAQ', 'faq', 'FAQ'],
     ['Trivia', 'trivia', 'Trivia'],
-    ['Board (ia)', 'https://filmboards.com/board/1{nottimdbid}/'],
-    ['Board (mc)', 'https://www.moviechat.org/movies/{imdbid}'],
+    ['Board', 'https://www.moviechat.org/movies/{imdbid}'],
     [],
     ['iCheckMovies', 'https://www.icheckmovies.com/search/movies/?query={imdbid}'],
     ['Wikipedia', 'https://en.wikipedia.org/w/index.php?title=Special:Search&search={title}'],
     ['RYM', 'http://rateyourmusic.com/search?searchterm={title}&searchtype=F'],
-    ['KinoPoisk', 'https://www.kinopoisk.ru/index.php?level=7&from=forma&result=adv&m_act[from]=forma&m_act[what]=content&m_act[find]={titlePlused}&m_act[from_year]={year_min}&m_act[to_year]={year_max}'],
+    ['KinoPoisk', 'https://www.kinopoisk.ru/index.php?level=7&from=forma&result=adv&m_act[from]=forma&m_act[what]=content&m_act[find]={title_plused}&m_act[from_year]={year_min}&m_act[to_year]={year_max}'],
     [],
-    ['RuTracker', 'https://rutracker.net/forum/tracker.php?nm={titlePlain} {year}&o=7&s=2'],
-    ['Kinozal', 'http://kinozal.tv/browse.php?s={titlePlused} {year}'],
+    ['RuTracker', 'https://rutracker.net/forum/tracker.php?nm={title_plain} {year}&o=7&s=2'],
+    ['Kinozal', 'http://kinozal.tv/browse.php?s={title_plused}+{year}'],
     ['KaraGarga', 'https://karagarga.in/browse.php?incldead=&d=&sort=added&d=DESC&search={nottimdbid}&search_type=imdb'],
     ['PassThePopcorn', 'https://passthepopcorn.me/torrents.php?action=advanced&searchstr={imdbid}'],
-    ['ThePirateBay', 'https://thepiratebay.org/search/{titlePlain} {year}/0/5/0'],
+    ['ThePirateBay', 'https://thepiratebay.org/search/{title_plain} {year}/0/5/0'],
     ['Kickass', 'https://katcr.co/new/search-torrents.php?search=%22{title}%22'],
     ['OpenSubtitles', 'https://www.opensubtitles.org/en/search2/sublanguageid-eng/subsumcd-1/imdbid-{imdbid}'],
     ['YouTube', 'https://www.youtube.com/results?search_query={title} {year}'],
     [],
     ['Reddit', 'https://www.reddit.com/r/gamerghazi+truefilm/search?q={title}&restrict_sr=on&include_over_18=on&sort=comments&t=all'],
     ['ФЭР', 'https://www.google.com/search?q=site:club443.ru %22{title}%22'],
-    ['RottenTomatoes', 'https://www.rottentomatoes.com/search/?search={titlePlain}'],
-    ['Letterboxd', 'https://letterboxd.com/search/films/{title}'],
+    ['RottenTomatoes', 'https://www.rottentomatoes.com/search/?search={title_plain}'],
+    ['Letterboxd', 'https://letterboxd.com/search/films/{imdbid}'],
     ['Google', 'https://www.google.com/search?q={title} {year}'],
     ['MUBI', 'https://www.google.com/search?q=site:mubi.com {title} {year}'],
     ['WhatTheMovie', 'https://whatthemovie.com/search?t=movie&q={imdbid}'],
@@ -189,8 +188,8 @@ const makeUrl = urlTemplate => {
     const titlePlain = encodeURIComponent(removeDiacritics(title));
     return urlTemplate
         .replace('{title}', encodeURIComponent(title))
-        .replace('{titlePlain}', titlePlain)
-        .replace('{titlePlused}', titlePlain.replace(/ /g, '+'))
+        .replace('{title_plain}', titlePlain)
+        .replace('{title_plused}', titlePlain.replace(/%20/g, '+'))
         .replace('{year}', year)
         .replace('{year_min}', year - 2)
         .replace('{year_max}', year + 2)

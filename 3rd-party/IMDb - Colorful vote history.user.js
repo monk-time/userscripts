@@ -1,29 +1,32 @@
 // ==UserScript==
-// @name           IMDb - Colorful vote history
-// @description    Colorizes lists based on ratings and adds stats to the sidebar. Does only work in compact/tabular view.
-// @author         kuehlschrank, monk-time
-// @include        http://www.imdb.com/list/*
-// @include        http://www.imdb.com/user/*/ratings*
-// @exclude        http://www.imdb.com/user/*/ratings*view=detail*
-// @icon           http://www.imdb.com/favicon.ico
-// @version        2011.8.14
+// @name        IMDb - Colorful vote history
+// @description Colorizes lists based on ratings and adds stats to the sidebar (compact view only).
+// @author      kuehlschrank, monk-time
+// @include     https://www.imdb.com/list/*
+// @icon        http://www.imdb.com/favicon.ico
+// @version     2021.03.12
 // ==/UserScript==
 
 'use strict';
 
 const thresholds = { good: 7, average: 5, bad: 0 };
-const getMovies = () => document.querySelectorAll('.list_item[data-item-id]');
+const movieSel = '.lister-item.mode-simple';
+const userRatingSel = '.col-user-rating .ipl-rating-star__rating';
+
+const getMovies = () => [...document.querySelectorAll(movieSel)];
+const getUserRating = movie => {
+    const s = movie.querySelector(userRatingSel).textContent;
+    return Math.round(parseFloat(s));
+};
+
+const getMovieData = movie => ({ movie, userRating: getUserRating(movie) });
 
 const extractCounts = () => {
-    const num = {
-        good: 0, average: 0, bad: 0, higher: 0, lower: 0, strong: 0,
-    };
+    const num = { good: 0, average: 0, bad: 0 };
 
-    for (const movie of getMovies()) {
-        const [userRating, imdbRating] = ['.your_ratings', '.user_rating']
-            .map(sel => Math.round(parseFloat(movie.querySelector(sel).textContent)));
-
-        if (Number.isNaN(userRating)) continue;
+    const movieData = getMovies().map(getMovieData);
+    for (const { movie, userRating } of movieData) {
+        if (!userRating) continue;
 
         for (const [type, minRating] of Object.entries(thresholds)) {
             if (userRating >= minRating) {
@@ -31,18 +34,6 @@ const extractCounts = () => {
                 movie.classList.add(`${type}${userRating}`);
                 break;
             }
-        }
-
-        if (Number.isNaN(imdbRating)) continue;
-
-        if (Math.abs(userRating - imdbRating) > 2) {
-            num.strong++;
-        }
-
-        if (userRating > imdbRating) {
-            num.higher++;
-        } else if (userRating < imdbRating) {
-            num.lower++;
         }
     }
 
@@ -55,8 +46,7 @@ const colorize = () => {
     if (num.ratings === 0) return;
 
     const sidebar = document.getElementById('sidebar');
-
-    const percentOfAll = n => Math.round(n / num.ratings * 100);
+    const percentOfAll = n => Math.round((n / num.ratings) * 100);
     sidebar.insertAdjacentHTML('beforeend', `
         <div id="rStats" class="aux-content-widget-2">
             <h4>Ratings:</h4>
@@ -71,17 +61,6 @@ const colorize = () => {
             </span>
         </div>
     `);
-
-    if (num.higher + num.lower === 0) return;
-
-    sidebar.insertAdjacentHTML('beforeend', `
-        <div id="dStats" class="aux-content-widget-2">
-            <h4>Deviations from IMDb ratings:</h4>
-            <b>${num.higher} higher</b> (${percentOfAll(num.higher)}%) and
-            <b>${num.lower} lower</b> (${percentOfAll(num.lower)}%),<br/>
-            thereof ${num.strong} stronger than 2 stars (${percentOfAll(num.strong)}%)
-        </div>
-    `);
 };
 
 const reset = () => {
@@ -89,30 +68,36 @@ const reset = () => {
         movie.className = movie.className.replace(/good\d+|average\d|bad\d/, '');
     }
 
-    for (const sel of ['rStats', 'dStats']) {
-        const section = document.getElementById(sel);
-        if (section) section.remove();
-    }
-};
-
-const onNodeInserted = e => {
-    if (e.target.nodeType === 1 && e.target.textContent.includes('Filtered list.')) {
-        reset();
-        colorize();
-    }
+    const section = document.getElementById('rStats');
+    if (section) section.remove();
 };
 
 const getCSS = (rank, color) =>
-    `span.${rank}, tr.${rank} td { background-color: ${color} !important; }`;
+    `span.${rank}, ${movieSel}.${rank} { background-color: ${color} !important; }`;
+
+// ----- MAIN -----
 
 document.head.insertAdjacentHTML('beforeend', `<style>
     span.stat { padding: 1px 8px !important; }
-    ${getCSS('bad1', '#ff9191')} ${getCSS('bad2', '#ffa5a5')}
-    ${getCSS('bad3', '#ffb8b8')} ${getCSS('bad4', '#ffcccc')}
-    ${getCSS('average5', '#ffe2cc')} ${getCSS('average6', '#f3ffcc')}
-    ${getCSS('good7', '#ccffcc')} ${getCSS('good8', '#b8ffb8')}
-    ${getCSS('good9', '#a5ffa5')} ${getCSS('good10', '#91ff91')}
+    ${getCSS('bad1', '#ff9191')}
+    ${getCSS('bad2', '#ffa5a5')}
+    ${getCSS('bad3', '#ffb8b8')}
+    ${getCSS('bad4', '#ffcccc')}
+    ${getCSS('average5', '#ffe2cc')}
+    ${getCSS('average6', '#f3ffcc')}
+    ${getCSS('good7', '#ccffcc')}
+    ${getCSS('good8', '#b8ffb8')}
+    ${getCSS('good9', '#a5ffa5')}
+    ${getCSS('good10', '#91ff91')}
 </style>`);
 
 colorize();
-document.addEventListener('DOMNodeInserted', onNodeInserted, false);
+
+const mut = new MutationObserver(mutList => mutList.forEach(({ addedNodes }) => {
+    if (!addedNodes.length) return;
+    reset();
+    colorize();
+}));
+
+const container = document.querySelector('.lister-list');
+mut.observe(container, { childList: true });

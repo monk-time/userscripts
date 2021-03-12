@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name           ICM Board - Reorg active topics
-// @description    Hide topics and header, re-sort threads (by subforums, unread first)
-// @namespace      monk-time
-// @author         monk-time
-// @include        http://www.icmforum.com/search/*?c=5
-// @icon           https://www.icheckmovies.com/favicon.ico
+// @name        ICM Board - Reorg active topics
+// @description Hide topics and header, re-sort threads (by subforums, unread first)
+// @namespace   monk-time
+// @author      monk-time
+// @include     http://www.icmforum.com/search/*?c=5
+// @icon        https://www.icheckmovies.com/favicon.ico
 // ==/UserScript==
 
 'use strict';
@@ -68,7 +68,7 @@ const getRowData = row => {
         String(forums.length) + forum;
     const isRead = row.querySelector('img').alt.endsWith(' (No new posts)');
     return {
-        id: id && id[1] || '',
+        id: (id && id[1]) || '',
         title: title.toLowerCase(),
         forum,
         key,
@@ -95,7 +95,7 @@ const reorderThreads = rows => table.append(...rows.sort(compareByUnreadForumTit
 const hideThreads = rows => rows
     .filter(r => {
         const { forum, id } = rowData.get(r);
-        return forumsToHide.includes(forum) && !idsToLeave.includes(id) ||
+        return (forumsToHide.includes(forum) && !idsToLeave.includes(id)) ||
             idsToHide.includes(id);
     })
     .forEach(r => r.classList.add('rat-hidden'));

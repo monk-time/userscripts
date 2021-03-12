@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name          IMDb - Details page links
-// @namespace     IMDb.com
-// @description   Adds some links to IMDb details page
-// @author        themagician, monk-time
-// @include       *imdb.com/title/*
-// @icon          http://www.imdb.com/favicon.ico
+// @name        IMDb - Details page links
+// @namespace   IMDb.com
+// @description Adds some links to IMDb details page
+// @author      themagician, monk-time
+// @include     *imdb.com/title/*
+// @icon        http://www.imdb.com/favicon.ico
 // ==/UserScript==
 
 'use strict';

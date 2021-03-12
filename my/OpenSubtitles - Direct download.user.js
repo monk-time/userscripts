@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name           OpenSubtitles - Direct download
-// @description    Turn the big download button into a direct URL
-// @namespace      monk-time
-// @author         monk-time
-// @include        http://www.opensubtitles.org/*/subtitles/*
-// @include        https://www.opensubtitles.org/*/subtitles/*
-// @icon           https://static.opensubtitles.org/favicon.ico
+// @name        OpenSubtitles - Direct download
+// @description Turn the big download button into a direct URL
+// @namespace   monk-time
+// @author      monk-time
+// @include     http://www.opensubtitles.org/*/subtitles/*
+// @include     https://www.opensubtitles.org/*/subtitles/*
+// @icon        https://static.opensubtitles.org/favicon.ico
 // ==/UserScript==
 
 'use strict';

@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name           Reddit - Highlight new comments
-// @description    Highlight new comments in a thread since your last visit
-// @namespace      monk-time
-// @author         JonnyRobbie, monk-time
-// @include        /^https?:\/\/([a-z]+\.)?reddit\.com\/r\/[a-zA-Z0-9_-]+\/comments\/[0-9a-z]+\/[^/]+\//
-// @icon           https://www.redditstatic.com/desktop2x/img/favicon/favicon-16x16.png
-// @version        1.9
+// @name        Reddit - Highlight new comments
+// @description Highlight new comments in a thread since your last visit
+// @namespace   monk-time
+// @author      JonnyRobbie, monk-time
+// @include     /^https?:\/\/([a-z]+\.)?reddit\.com\/r\/[a-zA-Z0-9_-]+\/comments\/[0-9a-z]+\/[^/]+\//
+// @icon        https://www.redditstatic.com/desktop2x/img/favicon/favicon-16x16.png
+// @version     1.9
 // ==/UserScript==
 
 'use strict';

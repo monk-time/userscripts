@@ -7,6 +7,7 @@
 // @license       MIT; https://opensource.org/licenses/MIT
 // @homepageURL   https://openuserjs.org/scripts/monk-time/ICM_-_Movie_info_labels
 // @updateURL     https://openuserjs.org/meta/monk-time/ICM_-_Movie_info_labels.meta.js
+// @supportURL    https://github.com/monk-time/userscripts/issues
 // @include       https://www.icheckmovies.com/lists/*
 // @include       https://www.icheckmovies.com/search/movies/*
 // @include       https://www.icheckmovies.com/movies/unchecked/*
@@ -21,7 +22,7 @@
 // @exclude       https://www.icheckmovies.com/lists/disliked/*
 // @exclude       https://www.icheckmovies.com/lists/watchlist/*
 // @icon          https://www.icheckmovies.com/favicon.ico
-// @version       1.0.2
+// @version       1.0.3
 // ==/UserScript==
 
 /* Changelog:
@@ -29,7 +30,8 @@
  * 2017.09.31  [0.9.0]: Fixed formatting.
  * 2017.11.23  [1.0.0]: Removed jQuery dependency, fixed for GM4.
  * 2017.11.23  [1.0.1]: Chrome didn't render sorting arrows correctly.
- * 2018.07.26  [1.0.2]: Fixed the watchlist page
+ * 2018.07.26  [1.0.2]: Fixed the watchlist page.
+ * 2021.04.11  [1.0.3]: Added @supportURL.
  */
 
 // TODO: keep sorting arrows visible

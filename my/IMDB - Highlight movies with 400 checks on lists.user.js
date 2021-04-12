@@ -11,14 +11,15 @@
 // @icon          https://ia.media-imdb.com/images/G/01/imdb/images/favicon-2165806970.ico
 // @grant         GM.xmlHttpRequest
 // @connect       icheckmovies.com
-// @version       1.4
+// @version       1.4.1
 // ==/UserScript==
 
 /* Changelog:
- * 2017.09.01  [1.2]: YQL no longer works, switched to GM_xmlhttpRequest for cross-origin requests.
- * 2017.11.24  [1.3]: Fixed GM_xmlhttpRequest for GM4/other engines compatibility.
+ * 2017.09.01  [1.2.0]: Switched from YQL to GM_xmlhttpRequest for cross-origin requests.
+ * 2017.11.24  [1.3.0]: Fixed GM_xmlhttpRequest for GM4/other engines compatibility.
  * 2018.15.02  [1.3.1]: Enabled on HTTPS pages.
- * 2021.04.12  [1.4]: Remove jQuery dependency and GM4 polyfill.
+ * 2021.04.12  [1.4.0]: Removed jQuery dependency and GM4 polyfill.
+ * 2021.04.12  [1.4.1]: Added a warning about working only in compact view.
  */
 
 'use strict';
@@ -83,10 +84,16 @@ const attachTriggerButton = () => {
 
     const elButton = document.querySelector('#ihm-button');
     elButton.addEventListener('click', () => {
+        if (elButton.classList.contains('disabled')) return;
+        if (!document.querySelector('.lister-mode.simple.active')) {
+            alert('The script works only in compact view. Please switch and try again.');
+            return;
+        }
+
         elButton.classList.add('disabled');
         const elMovies = document.querySelectorAll('.lister-item');
         elMovies.forEach(imdb2icm);
-    }, { once: true });
+    });
 
     document.head.insertAdjacentHTML('beforeend', `<style>
         #ihm-button { float: right; }

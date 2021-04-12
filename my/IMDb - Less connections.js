@@ -2,7 +2,7 @@
 // @name        IMDb - Less connections
 // @namespace   monk-time
 // @author      monk-time
-// @include     https://www.imdb.com/title/tt*/movieconnections/*
+// @include     https://www.imdb.com/title/tt*/movieconnections*
 // @icon        http://www.imdb.com/favicon.ico
 // ==/UserScript==
 

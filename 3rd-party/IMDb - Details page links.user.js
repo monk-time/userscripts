@@ -15,8 +15,8 @@
 //   {year}   {year_min}   {year_max}
 //   {imdbid} {nottimdbid}
 const urlTemplates = [
-    ['Refs', 'trivia?tab=mc', 'Connections'],
-    ['Reviews', 'reviews?filter=best', 'User Reviews'],
+    ['Refs', 'movieconnections', 'Connections'],
+    ['Reviews', 'reviews?sort=helpfulnessScore', 'User Reviews'],
     ['FAQ', 'faq', 'FAQ'],
     ['Trivia', 'trivia', 'Trivia'],
     ['Board', 'https://www.moviechat.org/movies/{imdbid}'],
@@ -136,6 +136,7 @@ for (const [base, letters] of Object.entries(defaultDiacriticsRemovalMap)) {
 const removeDiacritics = s => s
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
+    // eslint-disable-next-line no-control-regex
     .replace(/[^\u0000-\u007E]/g, x => diacriticsMap[x] || x);
 
 // ----- Main -----
@@ -151,7 +152,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
         text-align: right;
         position: absolute;
         top: 1px;
-        left: -170px;
+        left: -148px;
         background-color: #fff;
     }
 

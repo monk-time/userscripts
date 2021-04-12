@@ -10,7 +10,7 @@
 // @include       http://*.imdb.com/*
 // @include       https://*.imdb.com/*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
-// @icon          http://www.imdb.com/favicon.ico
+// @icon          https://ia.media-imdb.com/images/G/01/imdb/images/favicon-2165806970.ico
 // @version       1.0.3
 // ==/UserScript==
 

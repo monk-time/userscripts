@@ -254,7 +254,7 @@ class Tooltip {
 
     fade(fadeIn = false) {
         const a = this.alpha;
-        if (a !== this.maxAlpha && fadeIn || a !== 0 && !fadeIn) {
+        if ((a !== this.maxAlpha && fadeIn) || (a !== 0 && !fadeIn)) {
             const remainder = fadeIn ? this.maxAlpha - a : a;
             const delta = Math.min(this.fadeStep, remainder);
             this.alpha = a + delta * (fadeIn ? 1 : -1);
@@ -301,7 +301,7 @@ class ProgressBar {
 
     update() {
         this.done++;
-        const percent = Math.round(this.done * 100 / this.total);
+        const percent = Math.round((this.done * 100) / this.total);
         this.pb.style.width = `${percent}%`;
         this.pbTxt.textContent = `Loaded ${this.done}/${this.total}`;
         if (this.done >= this.total) {

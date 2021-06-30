@@ -12,6 +12,7 @@
 // @include     https://www.icheckmovies.com/movies/disliked/*
 // @include     https://www.icheckmovies.com/movies/watchlist/*
 // @include     https://www.icheckmovies.com/movies/?tags=*
+// @include     https://www.icheckmovies.com/movies/?sort=*
 // @icon        https://www.icheckmovies.com/favicon.ico
 // ==/UserScript==
 

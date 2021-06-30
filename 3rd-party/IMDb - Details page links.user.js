@@ -5,6 +5,7 @@
 // @author      themagician, monk-time
 // @include     *imdb.com/title/*
 // @icon        http://www.imdb.com/favicon.ico
+// @run-at      document-idle
 // ==/UserScript==
 
 'use strict';
@@ -142,23 +143,20 @@ const removeDiacritics = s => s
 // ----- Main -----
 
 document.head.insertAdjacentHTML('beforeend', `<style>
-    #pagecontent {
-        position: relative;
-    }
-
     #dpl-linkbar {
-        width: 148px;
+        width: 140px;
         padding: 10px;
         text-align: right;
         position: absolute;
-        top: 1px;
-        left: -148px;
-        background-color: #fff;
+        top: 50px;
+        left: 0px;
     }
 
     .dpl-link {
         display: block;
-        margin-bottom: 2px;
+        margin-bottom: -6px;
+        color: #aaa;
+        font-size: 0.8em;
     }
 </style>`);
 
@@ -173,14 +171,14 @@ const addLinkbar = () => {
         } else if (!innerTitle) {
             const url = makeUrl(urlTemplate);
             linkHTML = `<a class="dpl-link" href="${url}">${text}</a>`;
-        } else if (hasInnerPage(innerTitle)) {
+        } else {
             linkHTML = `<a class="dpl-link" href="${urlTemplate}"><b>${text}</b></a>`;
         }
 
         linkbar.insertAdjacentHTML('beforeend', linkHTML);
     }
 
-    const root = document.getElementById('pagecontent');
+    const root = document.querySelector('main > div');
     root.appendChild(linkbar);
 };
 
@@ -215,18 +213,10 @@ const parseMovieInfo = () => {
     };
 };
 
-const hasInnerPage = innerPageTitle =>
-    ![...document.querySelectorAll('#full_subnav .quicklink')]
-        .filter(el => el.textContent === innerPageTitle)[0]
-        .classList.contains('quicklinkGray');
-
 // Extra: make the whole title clickable
 const fixHeaderLink = () => {
-    const header = document.querySelector('.title_wrapper h1');
-    const titleNode = header.childNodes[0];
-    const title = titleNode.textContent.trim();
-    titleNode.textContent = ' ';
-    header.insertAdjacentHTML('afterbegin', `<a href="${document.URL}">${title}</a>`);
+    const elHeader = document.querySelector('[class^=TitleHeader__TitleText]');
+    elHeader.innerHTML = `<a href="${document.URL}">${elHeader.innerHTML}</a>`;
 };
 
 addLinkbar();

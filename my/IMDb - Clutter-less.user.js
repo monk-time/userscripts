@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name          IMDb - Clutter-less
-// @description   Remove junk from IMDb pages, such as a footer, recommendations, or images and ads in the sidebar.
+// @description   Remove junk from IMDb pages
 // @namespace     https://openuserjs.org/users/monk-time
 // @author        monk-time
 // @copyright     2017, monk-time (https://github.com/monk-time)
@@ -9,83 +9,59 @@
 // @updateURL     https://openuserjs.org/meta/monk-time/IMDb_-_Clutter-less.meta.js
 // @include       http://*.imdb.com/*
 // @include       https://*.imdb.com/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
 // @icon          https://ia.media-imdb.com/images/G/01/imdb/images/favicon-2165806970.ico
-// @version       1.0.3
+// @run-at        document-idle
+// @version       1.1
 // ==/UserScript==
 
 'use strict';
 
-const globalElements = {
-    shareButton: '.titleOverviewShareButton',
-    watchlistButton: '.wlb-title-main-details', // Redundant button below a title description
-    recommendations: '#titleRecs',
-    videosPhotos: '#titleVideoStrip, #titleImageStrip',
-    castPhotos: '.cast_list .primary_photo',
-    contribute: '.contribute',
-    recentlyViewed: '#rvi-div',
-    footer: '#footer',
-};
-const sidebarBlocksGood = [
-    'Related News', 'User Lists', 'User Polls', 'Quick Links',
-    'Projects In Development', 'How Much Have You Seen?', 'Top-Rated Episodes',
-];
-const sidebarBlocksWithImgs = ['User Lists', 'User Polls'];
+// ----- Settings -----
 
-const $main = $('body #root');
+const mainSections = [
+    'More like this',
+    'Videos',
+    'Photos',
+    'Contribute to this page',
+];
+
+// ----- Main -----
+
+const hideMainSections = () => {
+    const elMain = document.querySelector('[class^=TitleMainBelowTheFoldGroup__TitleMainPrimaryGroup]');
+    const elSections = [...elMain.querySelectorAll('section.ipc-page-section.ipc-page-section--base')];
+    const getSectionHeaderText = el => el.querySelector('.ipc-title__text')?.childNodes[0].textContent;
+    const sectionsByHeader = Object.fromEntries(
+        elSections
+            .filter(el => getSectionHeaderText(el))
+            .map(el => [getSectionHeaderText(el), el]),
+    );
+
+    for (const section of mainSections) {
+        sectionsByHeader[section]?.remove();
+    }
+};
+
+const hideFooterSections = () => {
+    document.querySelector('[class^=RecentlyViewedItems__RecentlyViewedContainer]')?.remove();
+    document.querySelector('footer')?.remove();
+};
+
 const reMovie = /imdb\.com\/title\/tt\d+/;
 const reName = /imdb\.com\/name\/nm\d+/;
 const [isOnMoviePage, isOnNamePage] = [reMovie, reName]
     .map(re => re.test(document.location.href));
 
-const actions = {
-    hideGlobalElements() {
-        for (const elem of Object.keys(globalElements)) {
-            $main.find(globalElements[elem]).remove();
-        }
+const hideSectionsInSidebar = () => {
+    if (!isOnMoviePage && !isOnNamePage) return;
 
-        // an ad outside of $main
-        $('#flashContent').remove();
-        // IMDbPro button with a separator
-        $main.find('.quicklink:contains("IMDbPro")').next().addBack().remove();
-        // ad-like sections
-        $main
-            .find('.widget_header h3:contains("Comic-Con"), .pri_image')
-            .parents('.article')
-            .remove();
-    },
-
-    compactSidebar() {
-        if (!isOnMoviePage && !isOnNamePage) {
-            return;
-        }
-
-        const $blocks = $main
-            .find('#sidebar, #maindetails_sidebar_bottom') // new-style, old-style
-            .children();
-        const getHeader = el => $(el).find('h3').text().trim();
-        const isHeaderInGroup = (el, group) => group.includes(getHeader(el));
-        const isGood = el => isHeaderInGroup(el, sidebarBlocksGood);
-        const hasImgs = el => isHeaderInGroup(el, sidebarBlocksWithImgs);
-
-        // remove all extra blocks
-        $blocks
-            .filter((_, el) => !isGood(el))
-            .remove();
-        // remove useless list images
-        $blocks
-            .filter((_, el) => hasImgs(el))
-            .find('a > img[alt="list image"], a > img[alt="poll image"]')
-            .parent()
-            .hide() // can't chain after remove() (end() is unwieldy here)
-            .parent('div') // only 'User Lists'
-            .siblings()
-            .css('margin-left', '4px');
-    },
+    const elMain = document.querySelector('[class^=TitleMainBelowTheFoldGroup__SidebarContainer]');
+    elMain.querySelectorAll('hgroup[data-testid="right-rail-more-to-explore"], [class^=SidebarSlot]')
+        .forEach(el => el.remove());
 };
 
-for (const key of Object.keys(actions)) {
-    actions[key]();
-}
+hideMainSections();
+hideFooterSections();
+hideSectionsInSidebar();
 
 console.log('IMDb has been cleaned up!');

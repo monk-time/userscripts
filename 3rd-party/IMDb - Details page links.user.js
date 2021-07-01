@@ -158,6 +158,14 @@ document.head.insertAdjacentHTML('beforeend', `<style>
         color: #aaa;
         font-size: 0.8em;
     }
+
+    .dpl-header {
+        text-decoration: none;
+    }
+
+    .dpl-header:visited {
+        color: inherit;
+    }
 </style>`);
 
 const addLinkbar = () => {
@@ -216,7 +224,7 @@ const parseMovieInfo = () => {
 // Extra: make the whole title clickable
 const fixHeaderLink = () => {
     const elHeader = document.querySelector('[class^=TitleHeader__TitleText]');
-    elHeader.innerHTML = `<a href="${document.URL}">${elHeader.innerHTML}</a>`;
+    elHeader.innerHTML = `<a href="${document.URL}" class="dpl-header">${elHeader.innerHTML}</a>`;
 };
 
 addLinkbar();

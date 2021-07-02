@@ -57,7 +57,9 @@ const hideSectionsInSidebar = () => {
 
     const elMain = document.querySelector('[class^=TitleMainBelowTheFoldGroup__SidebarContainer]');
     elMain.querySelectorAll('hgroup[data-testid="right-rail-more-to-explore"], [class^=SidebarSlot]')
-        .forEach(el => el.remove());
+        .forEach(el => {
+            el.style.display = 'none';
+        });
 };
 
 hideMainSections();

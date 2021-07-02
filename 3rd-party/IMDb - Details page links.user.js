@@ -191,7 +191,7 @@ const addLinkbar = () => {
 };
 
 const makeUrl = urlTemplate => {
-    const { title, year, imdbID, nottImdbID } = parseMovieInfo();
+    const { title, year, imdbID, nottImdbID } = movieInfo;
     const titlePlain = encodeURIComponent(removeDiacritics(title));
     return urlTemplate
         .replace('{title}', encodeURIComponent(title))
@@ -227,5 +227,6 @@ const fixHeaderLink = () => {
     elHeader.innerHTML = `<a href="${document.URL}" class="dpl-header">${elHeader.innerHTML}</a>`;
 };
 
+const movieInfo = parseMovieInfo();
 addLinkbar();
 fixHeaderLink();

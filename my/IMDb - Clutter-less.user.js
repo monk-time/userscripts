@@ -29,6 +29,7 @@ const mainSections = [
 
 const hideMainSections = () => {
     const elMain = document.querySelector('[class^=TitleMainBelowTheFoldGroup__TitleMainPrimaryGroup]');
+    if (!elMain) return;
     const elSections = [...elMain.querySelectorAll('section.ipc-page-section.ipc-page-section--base')];
     const getSectionHeaderText = el => el.querySelector('.ipc-title__text')?.childNodes[0].textContent;
     const sectionsByHeader = Object.fromEntries(
@@ -56,6 +57,7 @@ const hideSectionsInSidebar = () => {
     if (!isOnMoviePage && !isOnNamePage) return;
 
     const elMain = document.querySelector('[class^=TitleMainBelowTheFoldGroup__SidebarContainer]');
+    if (!elMain) return;
     elMain.querySelectorAll('hgroup[data-testid="right-rail-more-to-explore"], [class^=SidebarSlot]')
         .forEach(el => {
             el.style.display = 'none';

@@ -38,12 +38,12 @@ const calculateBPperYearperGB = (torrent, coj, cojyears, mightychef, mightychefd
     }
 
     const Q = b / (torrent.seeders ** c);
-    // var t = Math.exp((bpPerHour/((torrent.size/(1024 ** 3))*goldenMultiplier) - a) / Q) - 1.0; // seed time in days
+    // const t = Math.exp((bpPerHour / ((torrent.size / (1024 ** 3)) * goldenMultiplier) - a) / Q) - 1.0; // seed time in days
     const t = torrent.seedTimeSeconds / 86400; // We now have access to the raw seed time in seconds
 
-    const AvgBpPerYearPerGiB = (24.0 * (a * effectivePeriod + Q * ((t + 1.0 + effectivePeriod) * Math.log(t + 1.0 + effectivePeriod) - (t + 1.0) * Math.log(t + 1.0) - effectivePeriod)) * goldenMultiplier) / constYears;
+    const avgBpPerYearPerGiB = (24 * (a * effectivePeriod + Q * ((t + 1 + effectivePeriod) * Math.log(t + 1 + effectivePeriod) - (t + 1) * Math.log(t + 1) - effectivePeriod)) * goldenMultiplier) / constYears;
     if (!mightychef) {
-        return [AvgBpPerYearPerGiB, t];
+        return [avgBpPerYearPerGiB, t];
     }
 
     const s = torrent.size / (1024 * 1024 * 1024);
@@ -55,123 +55,107 @@ const calculateBPperYearperGB = (torrent, coj, cojyears, mightychef, mightychefd
 };
 
 const addLinks = () => {
-    if (window.location.pathname.indexOf('bonus.php') !== -1 || (window.location.pathname.indexOf('bprate.php') !== -1 && window.location.href.indexOf('optimization=true') === -1)) {
-        let linkbox = document.getElementsByClassName('linkbox');
-        // the 'linkbox' holds the links at the top of the pages where we want to add our link
-        if (linkbox.length === 0) {
-            return;
-        }
+    const onBonusPage = window.location.href.includes('bonus.php');
+    const onBPRatePage = window.location.href.includes('bprate.php');
+    const onBPOPage = window.location.href.includes('optimization=true');
+    const onProperPage = onBonusPage || (onBPRatePage && !onBPOPage);
+    const linkbox = document.querySelector('.linkbox');
+    if (!onProperPage || !linkbox) return;
 
-        linkbox = linkbox[0]; // we want the first linkbox
-
-        const a = document.createElement('a');
-        a.href = '/bprate.php?optimization=true';
-        a.innerHTML = 'Bonus point optimization';
-        a.setAttribute('class', 'linkbox__link');
-
-        linkbox.appendChild(document.createTextNode(' ['));
-        linkbox.appendChild(a);
-        linkbox.appendChild(document.createTextNode(']'));
-    }
+    linkbox.insertAdjacentHTML('beforeend', `
+        [<a class="linkbox__link" href="/bprate.php?optimization=true">Bonus point optimization</a>]
+    `);
 };
 
-const firstRun = cDiv => {
-    const messageDiv = document.createElement('div');
-    cDiv.appendChild(messageDiv);
+const firstRun = elContent => {
+    elContent.insertAdjacentHTML('beforeend', `
+        <div class="bpoMessage"></div>
+        <p>
+            Welcome to Chameleon's take on the Bonus Point Optimization script
+            (anyone else is welcome to modify and share their own versions).
+            <br>
+            Inspired by <a href="/user.php?id=104855">Fermis</a>'s
+            <a href="/forums.php?page=1&action=viewthread&threadid=26519">script</a>.
+            <br>
+            It gives a value (BP per GB per year) that allows the user to make an informed choice
+            as to which torrents to continue seeding to maximize BP rate with limited HDD space.
+            <br>
+            This script saves it's data locally, allowing you to load fresh data when you choose,
+            rather than on every run of the script.
+            <br>
+            Having the script run on it's own page also allows the data to be styled in a way
+            that is (hopefully) most useful.
+            <br>
+            <br>
+        </p>
+        <a class="bpoLoad" href="javascript:void(0);">
+            Load initial data for the script
+        </a>
+    `);
 
-    const p = document.createElement('p');
-    p.innerHTML = "Welcome to Chameleon's take on the Bonus Point Optimization script (anyone else is welcome to modify and share their own versions).<br />";
-    p.innerHTML += "Inspired by <a href='/user.php?id=104855'>Fermis</a>'s <a href='/forums.php?page=1&action=viewthread&threadid=26519'>script</a>.<br />";
-    p.innerHTML += 'It gives a value (BP per GB per year) that allows the user to make an informed choice as to which torrents to continue seeding to maximize BP rate with limited HDD space.<br />';
-    p.innerHTML += "This script saves it's data locally, allowing you to load fresh data when you choose, rather than on every run of the script.<br />";
-    p.innerHTML += "Having the script run on it's own page also allows the data to be styled in a way that is (hopefully) most useful.<br /><br />";
-
-    cDiv.appendChild(p);
-
-    const a = document.createElement('a');
-    cDiv.appendChild(a);
-    a.href = 'javascript:void(0);';
-    a.innerHTML = 'Load initial data for the script';
-    a.addEventListener('click', loadData.bind(undefined, cDiv, messageDiv), false);
-    // bind is a handy way to pass variables through javascript callbacks. The first argument gets bound to 'this' in the called function.
+    const elMessage = elContent.querySelector('.bpoMessage');
+    const elLink = elContent.querySelector('.bpoLoad');
+    elLink.addEventListener('click', () => loadData(elContent, elMessage));
 };
 
-const loadData = (cDiv, messageDiv) => {
-    let torrentData = window.localStorage.bpopt;
-    if (!torrentData) {
-        torrentData = { firstRun: true };
-    } else {
-        torrentData = JSON.parse(torrentData);
-    }
+const loadData = (elContent, elMessage) => {
+    const torrentDataStored = window.localStorage.bpopt;
+    const torrentData = torrentDataStored ?
+        JSON.parse(torrentDataStored) :
+        { firstRun: true };
 
     torrentData.torrents = [];
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    messageDiv.innerHTML = 'Loading first page from bprate.php';
+    elMessage.innerHTML = 'Loading first page from bprate.php';
 
     const xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = xhrFunc.bind(undefined, cDiv, messageDiv, xhr, parseData.bind(undefined, cDiv, messageDiv, 1));
+    xhr.onreadystatechange = xhrFunc.bind(undefined, elContent, elMessage, xhr, parseData.bind(undefined, elContent, elMessage, 1));
     xhr.open('GET', `${window.location.origin}/bprate.php?page=1`);
     xhr.send();
 };
 
-// a helper function that unwraps the returned xhr value and passes it to the function that takes the data
-const xhrFunc = (cDiv, messageDiv, xhr, func) => {
+const xhrFunc = (elContent, elMessage, xhr, func) => {
     if (xhr.readyState === 4) {
         if (xhr.status === 200) {
             func(xhr.responseText);
         } else {
-            messageDiv.innerHTML = 'Error loading the page';
+            elMessage.innerHTML = 'Error loading the page';
         }
     }
 };
 
-const parseSize = size => {
-    const s = parseFloat(size);
-    let p = 0;
+const parseUnit = s => ['KiB', 'MiB', 'GiB', 'TiB'].findIndex(unit => s.includes(unit)) + 1 || 0;
+const parseSize = size => parseFloat(size) * (1024 ** parseUnit(size));
 
-    if (size.indexOf('KiB') !== -1) {
-        p = 1;
-    } else if (size.indexOf('MiB') !== -1) {
-        p = 2;
-    } else if (size.indexOf('GiB') !== -1) {
-        p = 3;
-    } else if (size.indexOf('TiB') !== -1) {
-        p = 4;
-    }
-
-    return s * (1024 ** p);
-};
-
-const parseData = (cDiv, messageDiv, page, data) => {
+const parseData = (elContent, elMessage, page, data) => {
     const page1 = document.createElement('div');
     page1.innerHTML = data;
 
-    const torrentData = JSON.parse(window.localStorage.bpopt);
-    if (!torrentData.torrents) {
-        torrentData.torrents = [];
-    }
-
     if (page1.getElementsByTagName('tbody').length < 2) {
-        messageDiv.innerHTML = 'Error: You have no torrents in your <a href="/bprate.php?page=1">bprate</a> page, the script can not run.';
+        elMessage.innerHTML = `Error: You have no torrents in your
+            <a href="/bprate.php?page=1">bprate</a> page, the script can not run.`;
         return;
     }
 
-    const torrentTrs = page1.getElementsByTagName('tbody')[1].getElementsByTagName('tr');
-    for (let i = 0; i < torrentTrs.length; i++) {
-        const torrent = {};
-        const tr = torrentTrs[i];
-        const tds = tr.getElementsByTagName('td');
+    const torrentData = JSON.parse(window.localStorage.bpopt);
+    torrentData.torrents ??= [];
 
-        torrent.id = tds[0].firstElementChild.href.split('torrentid=')[1];
-        torrent.link = tds[0].firstElementChild.href;
-        torrent.title = tds[0].firstElementChild.innerHTML.trim();
-        torrent.gp = tds[1].innerHTML.indexOf('span') !== -1; // the GP column has a span in it if it's a GP and doesn't if not
-        torrent.size = parseSize(tds[2].innerHTML.replace(/,/g, ''));
-        torrent.seeders = parseInt(tds[3].innerHTML.replace(/,/g, ''), 10);
-        torrent.ratio = parseFloat(tds[6].innerHTML.replace(/,/g, ''));
-        torrent.bpyear = parseFloat(tds[9].innerHTML.replace(/,/g, ''));
-        torrent.bphour = parseFloat(tds[5].innerHTML.replace(/,/g, ''));
-        torrent.seedTimeSeconds = tds[4].getAttribute('data-seed-seconds');
+    const torrentTrs = page1.getElementsByTagName('tbody')[1].getElementsByTagName('tr');
+    for (const tr of torrentTrs) {
+        const tds = tr.getElementsByTagName('td');
+        const torrent = {
+            id: tds[0].firstElementChild.href.split('torrentid=')[1],
+            link: tds[0].firstElementChild.href,
+            title: tds[0].firstElementChild.innerHTML.trim(),
+            gp: tds[1].innerHTML.includes('span'),
+            size: parseSize(tds[2].innerHTML.replaceAll(',', '')),
+            seeders: parseInt(tds[3].innerHTML.replaceAll(',', ''), 10),
+            ratio: parseFloat(tds[6].innerHTML.replaceAll(',', '')),
+            bpyear: parseFloat(tds[9].innerHTML.replaceAll(',', '')),
+            bphour: parseFloat(tds[5].innerHTML.replaceAll(',', '')),
+            seedTimeSeconds: tds[4].getAttribute('data-seed-seconds'),
+        };
+
         torrent.bpyeargb = calculateBPperYearperGB(torrent);
         torrent.cojbpyeargb = calculateBPperYearperGB(torrent, true, torrentData.cojyears ? torrentData.cojyears : 3);
         torrent.mightychefyeargb = calculateBPperYearperGB(torrent, true, 1, true, torrentData.mightychefdays ? torrentData.mightychefdays : 365);
@@ -182,39 +166,44 @@ const parseData = (cDiv, messageDiv, page, data) => {
         torrentData.torrents.push(torrent);
     }
 
-    const lastPage = page1.getElementsByClassName('pagination__link--last');
-    if (lastPage.length === 0) {
-        if (torrentData.useCoj) {
-            torrentData.torrents.sort(cojbpyeargbSort.bind(true));
-        } else {
-            torrentData.torrents.sort(bpyeargbSort.bind(true));
-        }
+    const lastPage = page1.querySelector('.pagination__link--last');
+    if (!lastPage) {
+        const sortFunc = torrentData.useCoj ? cojbpyeargbSort : bpyeargbSort;
+        torrentData.torrents.sort(sortFunc.bind(true));
 
         torrentData.sortBy = 'BPYearGBr';
-        if (page === 1) {
-            messageDiv.innerHTML = 'Only one page of torrents found on bprate.php.';
-        } else {
-            messageDiv.innerHTML = `Finished loading ${page} pages from bprate.php.`;
-        }
+        elMessage.innerHTML = page === 1 ?
+            'Only one page of torrents found on bprate.php.' :
+            `Finished loading ${page} pages from bprate.php.`;
 
-        window.setTimeout(loadSeedingPage.bind(undefined, cDiv, messageDiv, torrentData, 1), 1000);
+        window.setTimeout(() => loadSeedingPage(elContent, elMessage, torrentData, 1), 1000);
     } else {
-        window.setTimeout(loadPage.bind(undefined, cDiv, messageDiv, page + 1), 1000); // Timeout between page loads to avoid PTP's "popcorn quota"
+        // Timeout between page loads to avoid PTP's "popcorn quota"
+        window.setTimeout(() => loadPage(elContent, elMessage, page + 1), 1000);
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
 };
 
-const loadSeedingPage = (cDiv, messageDiv, torrentData, page) => {
-    messageDiv.innerHTML = `Loading page ${page} from snatchlist.php`;
+const loadPage = (elContent, elMessage, page) => {
+    elMessage.innerHTML = `Loading page ${page} from bprate.php`;
 
     const xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = xhrFunc.bind(undefined, cDiv, messageDiv, xhr, parseSeedingData.bind(undefined, cDiv, messageDiv, torrentData, page));
+    xhr.onreadystatechange = xhrFunc.bind(undefined, elContent, elMessage, xhr, parseData.bind(undefined, elContent, elMessage, page));
+    xhr.open('GET', `${window.location.origin}/bprate.php?page=${page}`);
+    xhr.send();
+};
+
+const loadSeedingPage = (elContent, elMessage, torrentData, page) => {
+    elMessage.innerHTML = `Loading page ${page} from snatchlist.php`;
+
+    const xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = xhrFunc.bind(undefined, elContent, elMessage, xhr, parseSeedingData.bind(undefined, elContent, elMessage, torrentData, page));
     xhr.open('GET', `${window.location.origin}/snatchlist.php?full=1&order_by=seeding&order_way=desc&page=${page}`);
     xhr.send();
 };
 
-const parseSeedingData = (cDiv, messageDiv, torrentData, page, data) => {
+const parseSeedingData = (elContent, elMessage, torrentData, page, data) => {
     const page1 = document.createElement('div');
     page1.innerHTML = data;
 
@@ -242,42 +231,40 @@ const parseSeedingData = (cDiv, messageDiv, torrentData, page, data) => {
     }
 
     if (page1.getElementsByClassName('pagination__link--last').length === 0 || finished) {
-        messageDiv.innerHTML = `Finished loading ${page} pages from snatchlist.php.<br />Writing page.`;
-        window.setTimeout(showOptimization.bind(undefined, cDiv, torrentData), 1000);
+        elMessage.innerHTML = `Finished loading ${page} pages from snatchlist.php.<br />Writing page.`;
+        window.setTimeout(() => showOptimization(elContent, torrentData), 1000);
     } else {
-        window.setTimeout(loadSeedingPage.bind(undefined, cDiv, messageDiv, torrentData, page + 1), 1000);
+        window.setTimeout(() => loadSeedingPage(elContent, elMessage, torrentData, page + 1), 1000);
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
 };
 
 // eslint-disable-next-line complexity
-const showOptimization = (cDiv, torrentData) => {
-    if (torrentData.torrents && torrentData.torrents.length > 0) {
-        // used to have debugging info, but kept it in rather than reversing the conditional
-    } else {
+const showOptimization = (elContent, torrentData) => {
+    if (!torrentData.torrents?.length > 0) {
         window.localStorage.removeItem('bpopt');
-        firstRun(cDiv);
+        firstRun(elContent);
         return;
     }
 
-    cDiv.innerHTML = '';
-    cDiv.setAttribute('style', 'text-align: center;');
+    elContent.innerHTML = '';
+    elContent.setAttribute('style', 'text-align: center;');
     const message = document.createElement('div');
 
     let a = document.createElement('a');
-    cDiv.appendChild(a);
+    elContent.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Refresh data';
-    a.addEventListener('click', loadData.bind(undefined, cDiv, message), false);
-    cDiv.appendChild(document.createElement('br'));
-    cDiv.appendChild(document.createElement('br'));
+    a.addEventListener('click', () => loadData(elContent, message));
+    elContent.appendChild(document.createElement('br'));
+    elContent.appendChild(document.createElement('br'));
 
-    cDiv.appendChild(message);
+    elContent.appendChild(message);
 
     const headerDiv = document.createElement('div');
     headerDiv.setAttribute('style', 'margin: auto; width: 490px;');
-    cDiv.appendChild(headerDiv);
+    elContent.appendChild(headerDiv);
     const sTotal = document.createElement('span');
     headerDiv.appendChild(sTotal);
     sTotal.innerHTML = 'x torrents seeding, x GiB total. x BP per ';
@@ -307,10 +294,10 @@ const showOptimization = (cDiv, torrentData) => {
         shown.innerHTML += 'year.';
     }
 
-    cDiv.appendChild(document.createElement('br'));
+    elContent.appendChild(document.createElement('br'));
     const links = document.createElement('div');
     links.setAttribute('style', 'text-align: center;');
-    cDiv.appendChild(links);
+    elContent.appendChild(links);
 
     a = document.createElement('a');
     links.appendChild(a);
@@ -322,51 +309,51 @@ const showOptimization = (cDiv, torrentData) => {
     }
 
     a.innerHTML += ' Hidden';
-    a.addEventListener('click', showHidden.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => showHidden(elContent, torrentData));
     links.appendChild(document.createElement('br'));
 
     a = document.createElement('a');
     links.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Unhide All Torrents';
-    a.addEventListener('click', showAllTorrents.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => showAllTorrents(elContent, torrentData));
     links.appendChild(document.createElement('br'));
     a = document.createElement('a');
     links.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Invert hidden';
-    a.addEventListener('click', invertHidden.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => invertHidden(elContent, torrentData));
     links.appendChild(document.createElement('br'));
     a = document.createElement('a');
     links.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Hide GP Torrents';
-    a.addEventListener('click', hideGP.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => hideGP(elContent, torrentData));
     links.appendChild(document.createElement('br'));
     a = document.createElement('a');
     links.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Hide Torrents with ratio less than one';
-    a.addEventListener('click', hideRatioLessThanOne.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => hideRatioLessThanOne(elContent, torrentData));
     links.appendChild(document.createElement('br'));
     a = document.createElement('a');
     links.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Hide Torrents with seed time remaining';
-    a.addEventListener('click', hideNeedToSeed.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => hideNeedToSeed(elContent, torrentData));
     links.appendChild(document.createElement('br'));
     a = document.createElement('a');
     links.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Hide Torrents with fewer than 5 seeders';
-    a.addEventListener('click', hideFewSeeders.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => hideFewSeeders(elContent, torrentData));
     links.appendChild(document.createElement('br'));
     links.appendChild(document.createElement('br'));
     a = document.createElement('a');
     links.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Dump torrent json data';
-    a.addEventListener('click', dumpData.bind(undefined, torrentData.torrents));
+    a.addEventListener('click', () => dumpData(torrentData.torrents));
 
     links.appendChild(document.createElement('br'));
     links.appendChild(document.createElement('br'));
@@ -381,10 +368,10 @@ const showOptimization = (cDiv, torrentData) => {
     }
 
     a.innerHTML += 'Options';
-    a.addEventListener('click', showOptions.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => showOptions(elContent, torrentData));
 
     let div = document.createElement('div');
-    cDiv.appendChild(div);
+    elContent.appendChild(div);
     if (!torrentData.showOptions) {
         div.setAttribute('style', 'display: none;');
     }
@@ -398,7 +385,7 @@ const showOptimization = (cDiv, torrentData) => {
         a.innerHTML = 'Not using coj\'s algorithm';
     }
 
-    a.addEventListener('click', useCoj.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => useCoj(elContent, torrentData));
     div.appendChild(document.createElement('br'));
 
     a = document.createElement('a');
@@ -410,7 +397,7 @@ const showOptimization = (cDiv, torrentData) => {
         a.innerHTML = 'Not using mightychef\'s algorithm';
     }
 
-    a.addEventListener('click', useMightychef.bind(undefined, cDiv, torrentData), false);
+    a.addEventListener('click', () => useMightychef(elContent, torrentData));
     div.appendChild(document.createElement('br'));
 
     let label = document.createElement('span');
@@ -430,7 +417,7 @@ const showOptimization = (cDiv, torrentData) => {
     cont.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Apply';
-    a.addEventListener('click', applyCojYears.bind(undefined, cDiv, torrentData, input), false);
+    a.addEventListener('click', () => applyCojYears(elContent, torrentData, input));
     div.appendChild(document.createElement('br'));
 
     label = document.createElement('span');
@@ -450,7 +437,7 @@ const showOptimization = (cDiv, torrentData) => {
     cont.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Apply';
-    a.addEventListener('click', applyMightychefYears.bind(undefined, cDiv, torrentData, mightychefdaysInput), false);
+    a.addEventListener('click', () => applyMightychefYears(elContent, torrentData, mightychefdaysInput));
     div.appendChild(document.createElement('br'));
 
     label = document.createElement('span');
@@ -470,7 +457,7 @@ const showOptimization = (cDiv, torrentData) => {
     cont.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Apply';
-    a.addEventListener('click', applyDivisor.bind(undefined, cDiv, torrentData, input), false);
+    a.addEventListener('click', () => applyDivisor(elContent, torrentData, input));
     div.appendChild(document.createElement('br'));
 
     label = document.createElement('span');
@@ -490,7 +477,7 @@ const showOptimization = (cDiv, torrentData) => {
     cont.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Apply';
-    a.addEventListener('click', applyMightychefTarget.bind(undefined, cDiv, torrentData, input), false);
+    a.addEventListener('click', () => applyMightychefTarget(elContent, torrentData, input));
     div.appendChild(document.createElement('br'));
 
     label = document.createElement('span');
@@ -510,19 +497,18 @@ const showOptimization = (cDiv, torrentData) => {
     cont.appendChild(a);
     a.href = 'javascript:void(0);';
     a.innerHTML = 'Apply';
-    a.addEventListener('click', applyMinimumSeedTime.bind(undefined, cDiv, torrentData, input), false);
+    a.addEventListener('click', () => applyMinimumSeedTime(elContent, torrentData, input));
 
-    cDiv.appendChild(document.createElement('br'));
-    cDiv.appendChild(document.createElement('br'));
+    elContent.appendChild(document.createElement('br'));
+    elContent.appendChild(document.createElement('br'));
 
     const list = document.createElement('div');
-    cDiv.appendChild(list);
+    elContent.appendChild(list);
     list.setAttribute('id', 'table');
 
     let totalTorrents = 0;
     let totalSize = 0;
     let totalBPYear = 0;
-    const mightychefTotalBPYear = 0;
     let hiddenTotal = 0;
     let hiddenSize = 0;
     let hiddenBPYear = 0;
@@ -563,7 +549,7 @@ const showOptimization = (cDiv, torrentData) => {
         span.appendChild(a);
         a.href = 'javascript:void(0);';
         a.innerHTML = headers[i].title;
-        a.addEventListener('click', sortTorrents.bind(a, cDiv, torrentData), false);
+        a.addEventListener('click', sortTorrents.bind(a, elContent, torrentData));
         span.setAttribute('style', `${spanStyles} width: ${headers[i].width}; background: rgba(0, 0, 0, 0.2);`);
     }
 
@@ -698,7 +684,7 @@ const showOptimization = (cDiv, torrentData) => {
         span.appendChild(a);
         a.href = 'javascript:void(0);';
         a.innerHTML = 'X';
-        a.addEventListener('click', hideTorrent.bind(undefined, i, cDiv, torrentData), false);
+        a.addEventListener('click', () => hideTorrent(i, elContent, torrentData));
     }
 
     const spanStyle1 = 'width: 130px; text-align: right; display: inline-block;';
@@ -717,7 +703,7 @@ const showOptimization = (cDiv, torrentData) => {
         torrentData.mightychefdays = parseFloat(mightychefdays) / (totalBPYear / parseInt(target, 10));
         torrentData.loops = torrentData.loops ? torrentData.loops + 1 : 1;
         window.localStorage.bpopt = JSON.stringify(torrentData);
-        showOptimization(cDiv, torrentData);
+        showOptimization(elContent, torrentData);
         return;
     }
 
@@ -817,7 +803,6 @@ const dumpData = torrents => {
 };
 
 const addCSVtoLink = (a, torrentData) => {
-    // var fields=["id", "link", "title", "gp", "size", "seeders", "ratio", "bpyear", "bphour", "seedtimeseconds", "bpyeargb", "cojbpyeargb", "mightychefyeargb", "seedTimeDays", "hidden", "seedTimeLeft"];
     const fields = ['id', 'link', 'title', 'gp', 'size', 'seeders', 'ratio', 'bpyear', 'bphour', 'seedtimeseconds', 'bpyeargb', 'cojbpyeargb', 'mightychefyeargb', 'seedTimeDays', 'hidden', 'seedTimeLeft'];
 
     let text = '';
@@ -830,7 +815,7 @@ const addCSVtoLink = (a, torrentData) => {
         }
     }
 
-    window.setTimeout(actualAddCSV.bind(undefined, a, torrentData, 0, text, fields), 0);
+    window.setTimeout(() => actualAddCSV(a, torrentData, 0, text, fields), 0);
 };
 
 const actualAddCSV = (a, torrentData, index, text, fields) => {
@@ -863,11 +848,11 @@ const actualAddCSV = (a, torrentData, index, text, fields) => {
         a.href = `data:text/csv,${text}`;
         a.innerHTML = 'Save CSV';
     } else {
-        window.setTimeout(actualAddCSV.bind(undefined, a, torrentData, index, text, fields), 0);
+        window.setTimeout(() => actualAddCSV(a, torrentData, index, text, fields), 0);
     }
 };
 
-function sortTorrents(cDiv, torrentData) {
+function sortTorrents(elContent, torrentData) {
     let sortBy = this.innerHTML.replace(/[/, ]/g, '');
     const sortFunc = getSortFunc(sortBy, torrentData.sortBy, torrentData.useCoj, torrentData.useMightychef, torrentData.mightychefdays ? torrentData.mightychefdays : 0);
     if (torrentData.sortBy === sortBy) {
@@ -877,7 +862,7 @@ function sortTorrents(cDiv, torrentData) {
     torrentData.sortBy = sortBy;
     torrentData.torrents.sort(sortFunc);
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 }
 
 const getSortFunc = (sortBy, existingSortBy, coj, mightychef, mightychefdays) => {
@@ -991,14 +976,14 @@ function ratioSort(a, b) {
     let ratioB = 999999;
     if (a.ratio.length > 2) { // the ratio was successfully split, so it isn't --
         ratioA = parseFloat(a.ratio.split('>')[1].replace(/,/g, ''));
-        if (isNaN(ratioA)) { // ratioA is infinite
+        if (Number.isNaN(ratioA)) { // ratioA is infinite
             ratioA = 9999991;
         }
     }
 
     if (b.ratio.length > 2) { // the ratio was successfully split, so it isn't --
         ratioB = parseFloat(b.ratio.split('>')[1].replace(/,/g, ''));
-        if (isNaN(ratioB)) { // ratioB is infinite
+        if (Number.isNaN(ratioB)) { // ratioB is infinite
             ratioB = 9999991;
         }
     }
@@ -1017,20 +1002,20 @@ function seedTimeSort(a, b) {
     return val;
 }
 
-const hideTorrent = (i, cDiv, torrentData) => {
+const hideTorrent = (i, elContent, torrentData) => {
     const t = torrentData.torrents[i];
     t.hidden = !t.hidden;
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const showTorrent = (i, cDiv, torrentData) => {
+const showTorrent = (i, elContent, torrentData) => {
     torrentData.torrents[i].hidden = false;
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const useMightychef = (cDiv, torrentData, a) => {
+const useMightychef = (elContent, torrentData, a) => {
     if (torrentData.useMightychef) {
         a.innerHTML = "Not using mightychef's algorithm";
         torrentData.useMightychef = false;
@@ -1040,10 +1025,10 @@ const useMightychef = (cDiv, torrentData, a) => {
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const useCoj = (cDiv, torrentData, a) => {
+const useCoj = (elContent, torrentData, a) => {
     if (torrentData.useCoj) {
         a.innerHTML = "Not using coj's algorithm";
         torrentData.useCoj = false;
@@ -1053,10 +1038,10 @@ const useCoj = (cDiv, torrentData, a) => {
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const applyCojYears = (cDiv, torrentData, input) => {
+const applyCojYears = (elContent, torrentData, input) => {
     torrentData.cojyears = input.value;
     for (let i = 0; i < torrentData.torrents.length; i++) {
         const torrent = torrentData.torrents[i];
@@ -1064,10 +1049,10 @@ const applyCojYears = (cDiv, torrentData, input) => {
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const applyMightychefYears = (cDiv, torrentData, input) => {
+const applyMightychefYears = (elContent, torrentData, input) => {
     torrentData.mightychefdays = input.value;
     for (let i = 0; i < torrentData.torrents.length; i++) {
         const torrent = torrentData.torrents[i];
@@ -1075,130 +1060,122 @@ const applyMightychefYears = (cDiv, torrentData, input) => {
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const applyMinimumSeedTime = (cDiv, torrentData, input) => {
+const applyMinimumSeedTime = (elContent, torrentData, input) => {
     torrentData.minimumSeedTime = input.value;
     window.localStorage.bpopt = JSON.stringify(torrentData);
     if (torrentData.hideNeedToSee) {
         torrentData = rehide(torrentData);
     }
 
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
 const calculateMightychefYears = (torrent, days) =>
     calculateBPperYearperGB(torrent, true, 1, true, days);
 
-const applyDivisor = (cDiv, torrentData, input) => {
+const applyDivisor = (elContent, torrentData, input) => {
     torrentData.divisor = parseFloat(input.value);
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const applyMightychefTarget = (cDiv, torrentData, input) => {
+const applyMightychefTarget = (elContent, torrentData, input) => {
     torrentData.mightychefTarget = parseFloat(input.value);
     torrentData.loops = 0;
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const invertHidden = (cDiv, torrentData) => {
-    for (let i = 0; i < torrentData.torrents.length; i++) {
-        torrentData.torrents[i].hidden = !torrentData.torrents[i].hidden;
+const invertHidden = (elContent, torrentData) => {
+    for (const torrent of torrentData.torrents) {
+        torrent.hidden = !torrent.hidden;
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const showAllTorrents = (cDiv, torrentData) => {
-    for (let i = 0; i < torrentData.torrents.length; i++) {
-        torrentData.torrents[i].hidden = false;
+const showAllTorrents = (elContent, torrentData) => {
+    for (const torrent of torrentData.torrents) {
+        torrent.hidden = false;
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const showHidden = (cDiv, torrentData) => {
+const showHidden = (elContent, torrentData) => {
     torrentData.showHidden = !torrentData.showHidden;
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const showOptions = (cDiv, torrentData) => {
+const showOptions = (elContent, torrentData) => {
     torrentData.showOptions = !torrentData.showOptions;
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const hideGP = (cDiv, torrentData) => {
-    for (let i = 0; i < torrentData.torrents.length; i++) {
-        const t = torrentData.torrents[i];
-        if (t.gp) {
-            torrentData.torrents[i].hidden = true;
+const hideGP = (elContent, torrentData) => {
+    for (const torrent of torrentData.torrents) {
+        if (torrent.gp) {
+            torrent.hidden = true;
         }
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const hideNeedToSeed = (cDiv, torrentData) => {
-    for (let i = 0; i < torrentData.torrents.length; i++) {
-        const t = torrentData.torrents[i];
-        // if(t.seedTimeLeft != 'Complete')
+const hideNeedToSeed = (elContent, torrentData) => {
+    for (const torrent of torrentData.torrents) {
         if (torrentData.minimumSeedTime > 0) {
-            if (t.seedTimeDays < torrentData.minimumSeedTime) {
-                torrentData.torrents[i].hidden = true;
+            if (torrent.seedTimeDays < torrentData.minimumSeedTime) {
+                torrent.hidden = true;
             }
         } else {
-            if (t.seedTimeDays > -torrentData.minimumSeedTime) {
-                torrentData.torrents[i].hidden = true;
+            if (torrent.seedTimeDays > -torrentData.minimumSeedTime) {
+                torrent.hidden = true;
             }
         }
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const hideRatioLessThanOne = (cDiv, torrentData) => {
-    for (let i = 0; i < torrentData.torrents.length; i++) {
-        const t = torrentData.torrents[i];
+const hideRatioLessThanOne = (elContent, torrentData) => {
+    for (const torrent of torrentData.torrents) {
         try {
-            if (parseFloat(t.ratio.split('>')[1]) < 1.0) {
-                torrentData.torrents[i].hidden = true;
+            if (parseFloat(torrent.ratio.split('>')[1]) < 1.0) {
+                torrent.hidden = true;
             }
         } catch (e) {
-            console.log(`Bonus Point Optimization script: t.ratio is something funny: ${t.ratio}`);
+            console.log(`BPO: torrent.ratio is something funny: ${torrent.ratio}`);
         }
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
-const hideFewSeeders = (cDiv, torrentData) => {
-    for (let i = 0; i < torrentData.torrents.length; i++) {
-        const t = torrentData.torrents[i];
-        if (t.seeders <= 5) {
-            torrentData.torrents[i].hidden = true;
+const hideFewSeeders = (elContent, torrentData) => {
+    for (const torrent of torrentData.torrents) {
+        if (torrent.seeders <= 5) {
+            torrent.hidden = true;
         }
     }
 
     window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(cDiv, torrentData);
+    showOptimization(elContent, torrentData);
 };
 
 const printNumber = (number, unfixed) => {
-    if (!unfixed) {
-        return number.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    } else {
-        return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    }
+    const numberStr = unfixed ? number.toString() : number.toFixed(2);
+    return numberStr.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
 const printSize = size => {
@@ -1233,61 +1210,49 @@ const printSize = size => {
     }
 };
 
-const loadPage = (cDiv, messageDiv, page) => {
-    messageDiv.innerHTML = `Loading page ${page} from bprate.php`;
-
-    const xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = xhrFunc.bind(undefined, cDiv, messageDiv, xhr, parseData.bind(undefined, cDiv, messageDiv, page));
-    xhr.open('GET', `${window.location.origin}/bprate.php?page=${page}`);
-    xhr.send();
-};
-
 // ----- MAIN -----
 
-// We will create a new page, bpoptimization.php, that returns a 404 error on PTP, so we can make it do what we want from scratch.
-// Add links to the new page on both the bonus.php and bprate.php pages, and do it in a function so we can quick return out:
+// Add links to the new page on both the bonus.php and bprate.php pages
 addLinks();
 
-let torrentData = window.localStorage.bpopt;
-if (!torrentData) {
-    torrentData = { firstRun: true };
-} else {
-    torrentData = JSON.parse(torrentData);
-    torrentData.loops = 1;
-    torrentData.firstRun = false;
-}
+const torrentDataStored = window.localStorage.bpopt;
+const torrentData = torrentDataStored ?
+    {
+        ...JSON.parse(torrentDataStored),
+        loops: 1,
+        firstRun: false,
+    } :
+    {
+        firstRun: true,
+    };
 
 window.localStorage.bpopt = JSON.stringify(torrentData);
 
-if (window.location.href.indexOf('optimization=true') !== -1) {
-    const s = document.createElement('style');
-    document.head.appendChild(s);
-    s.innerHTML = '.hover:hover { background: rgba(255, 255, 255, 0.2); }';
-    // Alamak asked us not to use our own page, as 404 errors are logged. Wipe the bprate page and recreate the template of the 404 page if our variable is set
-    const c = document.getElementById('content');
-    c.innerHTML = '';
-    const div = document.createElement('div');
-    div.setAttribute('class', 'thin');
-    c.appendChild(div);
-    const d = document.createElement('h2');
-    d.setAttribute('class', 'page__title');
-    div.appendChild(d);
-    const a = document.createElement('a');
-    a.innerHTML = 'BP rates';
-    a.href = '/bprate.php';
-    d.appendChild(a);
-    d.appendChild(document.createTextNode(' > Bonus point optimization'));
-    const contentDiv = document.createElement('div');
-    div.appendChild(contentDiv);
-    contentDiv.setAttribute('class', 'panel');
-    // We're on our created page, do some cleanup:
-    document.title = 'Bonus point optimization :: PassThePopcorn'; // set the window title
+if (window.location.href.includes('optimization=true')) {
+    document.head.insertAdjacentHTML('beforeend', `
+        <style>
+            .hover:hover { background: rgba(255, 255, 255, 0.2); }
+        </style>
+    `);
+    // Alamak asked us not to use our own page, as 404 errors are logged.
+    // Wipe the bprate page and recreate the template of the 404 page if our variable is set
+    document.title = 'Bonus point optimization :: PassThePopcorn';
+    document.getElementById('content').innerHTML = `
+        <div class="thin">
+            <h2 class="page__title">
+                <a href="/bprate.php">BP rates</a> > Bonus point optimization
+            </h2>
+            <div class="panel bpoContent"></div>
+        </div>
+    `;
 
     const data = JSON.parse(window.localStorage.bpopt);
-
+    const elContent = document.querySelector('.bpoContent');
     if (data.firstRun) {
-        firstRun(contentDiv); // if our local storage value isn't set, or is empty (script reset), introduce the script
+        // If our local storage value isn't set, or is empty (script reset), introduce the script
+        firstRun(elContent);
     } else {
-        showOptimization(contentDiv, data, ''); // otherwise show the page with cached data
+        // Otherwise show the page with cached data
+        showOptimization(elContent, data, '');
     }
 }

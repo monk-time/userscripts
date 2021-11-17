@@ -10,6 +10,7 @@
 
 /* eslint-disable max-len */
 /* eslint-disable prefer-destructuring */
+/* eslint-disable no-await-in-loop */
 
 'use strict';
 
@@ -83,51 +84,76 @@ const firstRun = elContent => {
     const elLink = elContent.querySelector('#bpoLoad');
     elLink.addEventListener('click', e => {
         e.preventDefault();
-        loadData(elContent, elMessage);
+        try {
+            loadData(elContent, elMessage);
+        } catch (ex) {
+            elMessage.innerHTML = ex.message;
+        }
     });
 };
 
-const loadData = (elContent, elMessage) => {
-    const torrentDataStored = window.localStorage.bpopt;
-    const torrentData = torrentDataStored ?
-        JSON.parse(torrentDataStored) :
-        { firstRun: true };
-
-    torrentData.torrents = [];
-    window.localStorage.bpopt = JSON.stringify(torrentData);
-    elMessage.innerHTML = 'Loading first page from bprate.php';
-
-    const xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = xhrFunc.bind(undefined, elContent, elMessage, xhr, parseBPRatePage.bind(undefined, elContent, elMessage, 1));
-    xhr.open('GET', `${window.location.origin}/bprate.php?page=1`);
-    xhr.send();
-};
-
-const xhrFunc = (elContent, elMessage, xhr, func) => {
-    if (xhr.readyState === 4) {
-        if (xhr.status === 200) {
-            func(xhr.responseText);
-        } else {
-            elMessage.innerHTML = 'Error loading the page';
-        }
-    }
-};
-
-const parseBPRatePage = (elContent, elMessage, page, data) => {
-    const page1 = document.createElement('div');
-    page1.innerHTML = data;
-
-    if (page1.getElementsByTagName('tbody').length < 2) {
-        elMessage.innerHTML = `Error: You have no torrents in your
-            <a href="/bprate.php?page=1">bprate</a> page, the script can not run.`;
-        return;
-    }
-
+const loadData = async (elContent, elMessage) => {
     const torrentData = JSON.parse(window.localStorage.bpopt);
-    torrentData.torrents ??= [];
+    torrentData.torrents = [];
 
-    const torrentTrs = page1.getElementsByTagName('tbody')[1].getElementsByTagName('tr');
-    for (const tr of torrentTrs) {
+    let bpRatePagesTotal;
+    let bpRatePageNum = 1;
+    do {
+        const elPage = await fetchBPRatePage(bpRatePageNum, elMessage);
+        bpRatePageNum++;
+        parseBPRatePage(elPage, torrentData);
+        await sleep(1000); // delay to avoid PTP's "popcorn quota"
+
+        if (bpRatePagesTotal) continue;
+        const elLastPage = elPage.querySelector('.pagination__link--last');
+        bpRatePagesTotal = Number(elLastPage?.href.match(/page=(\d+)/)?.[1] ?? '1');
+        if (!bpRatePagesTotal) throw new Error('Unexpected number of pages on bprate.php');
+    } while (bpRatePageNum <= bpRatePagesTotal);
+
+    const sortFunc = torrentData.useCoj ? sortFuncs.CojBPYearGB : sortFuncs.BPYearGB;
+    torrentData.torrents.sort(sortFunc(-1));
+    torrentData.sortBy = 'BPYearGBr';
+
+    let snatchlistPagesTotal;
+    let snatchlistPageNum = 1;
+    do {
+        const elPage = await fetchSnatchlistPage(snatchlistPageNum, elMessage);
+        snatchlistPageNum++;
+        parseSnatchlistPage(elPage, torrentData);
+        await sleep(1000);
+
+        // Stop early after fetching all seeded torrents
+        if (elPage.querySelector('.snatchlist-status--not-seeding')) break;
+
+        if (snatchlistPagesTotal) continue;
+        const elLastPage = elPage.querySelector('.pagination__link--last');
+        snatchlistPagesTotal = Number(elLastPage?.href.match(/page=(\d+)/)?.[1] ?? '1');
+        if (!snatchlistPagesTotal) throw new Error('Unexpected number of pages on snatchlist.php');
+    } while (snatchlistPageNum <= snatchlistPagesTotal);
+
+    window.localStorage.bpopt = JSON.stringify(torrentData);
+    showOptimization(elContent, torrentData);
+};
+
+const fetchPage = urlPart => async (pageNum, elMessage) => {
+    elMessage.innerHTML = `Loading page ${pageNum} from ${urlPart.split('?')[0]}`;
+    const url = `${window.location.origin}/${urlPart}page=${pageNum}`;
+    const r = await fetch(url, { credentials: 'include' });
+    if (!r.ok) throw new Error('Error loading the page');
+    return parseHTML(await r.text());
+};
+
+const fetchBPRatePage = fetchPage('bprate.php?');
+const fetchSnatchlistPage = fetchPage('snatchlist.php?full=1&order_by=seeding&order_way=desc&');
+
+const parseBPRatePage = (elPage, torrentData) => {
+    const elTable = elPage.querySelector('table:nth-of-type(2) tbody');
+    if (!elTable) {
+        throw new Error(`You have no torrents on your
+            <a href="/bprate.php?page=1">bprate</a> page, the script cannot run.`);
+    }
+
+    for (const tr of elTable.children) {
         const tds = tr.getElementsByTagName('td');
         const torrent = {
             id: tds[0].firstElementChild.href.split('torrentid=')[1],
@@ -151,79 +177,26 @@ const parseBPRatePage = (elContent, elMessage, page, data) => {
 
         torrentData.torrents.push(torrent);
     }
+};
 
-    const lastPage = page1.querySelector('.pagination__link--last');
-    if (!lastPage) {
-        const sortFunc = torrentData.useCoj ? sortFuncs.CojBPYearGB : sortFuncs.BPYearGB;
-        torrentData.torrents.sort(sortFunc(-1));
+const parseSnatchlistPage = (elPage, torrentData) => {
+    const trs = [...elPage.querySelectorAll('#SnatchData table tbody tr')];
+    const torrents = trs.map(tr => ({
+        id: tr.children[0].firstElementChild.href.split('torrentid=')[1],
+        ratio: tr.children[3].innerHTML,
+        seeding: tr.children[7].textContent === 'Yes',
+        seedTimeLeft: tr.children[8].textContent,
+    })).filter(({ seeding }) => seeding);
 
-        torrentData.sortBy = 'BPYearGBr';
-        elMessage.innerHTML = page === 1 ?
-            'Only one page of torrents found on bprate.php.' :
-            `Finished loading ${page} pages from bprate.php.`;
-
-        window.setTimeout(() => loadSnatchlistPage(elContent, elMessage, torrentData, 1), 1000);
-    } else {
-        // Timeout between page loads to avoid PTP's "popcorn quota"
-        window.setTimeout(() => loadBPRatePage(elContent, elMessage, page + 1), 1000);
+    for (const tParsed of torrents) {
+        const tStored = torrentData.torrents.find(({ id }) => id === tParsed.id);
+        if (!tStored) continue;
+        tStored.ratio = tParsed.ratio;
+        tStored.seedTimeLeft = tParsed.seedTimeLeft;
     }
-
-    window.localStorage.bpopt = JSON.stringify(torrentData);
 };
 
-const loadBPRatePage = (elContent, elMessage, page) => {
-    elMessage.innerHTML = `Loading page ${page} from bprate.php`;
-
-    const xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = xhrFunc.bind(undefined, elContent, elMessage, xhr, parseBPRatePage.bind(undefined, elContent, elMessage, page));
-    xhr.open('GET', `${window.location.origin}/bprate.php?page=${page}`);
-    xhr.send();
-};
-
-const loadSnatchlistPage = (elContent, elMessage, torrentData, page) => {
-    elMessage.innerHTML = `Loading page ${page} from snatchlist.php`;
-
-    const xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = xhrFunc.bind(undefined, elContent, elMessage, xhr, parseSnatchlistPage.bind(undefined, elContent, elMessage, torrentData, page));
-    xhr.open('GET', `${window.location.origin}/snatchlist.php?full=1&order_by=seeding&order_way=desc&page=${page}`);
-    xhr.send();
-};
-
-const parseSnatchlistPage = (elContent, elMessage, torrentData, page, data) => {
-    const page1 = document.createElement('div');
-    page1.innerHTML = data;
-
-    const trs = page1.getElementsByTagName('table')[0].getElementsByTagName('tr');
-    let finished = false;
-
-    for (let i = 1; i < trs.length; i++) {
-        const tds = trs[i].getElementsByTagName('td');
-        if (tds[7].textContent !== 'Yes') {
-            finished = true;
-            break;
-        }
-
-        const id = tds[0].firstElementChild.href.split('torrentid=')[1];
-        const ratio = tds[3].innerHTML;
-        const seedTimeLeft = tds[8].textContent;
-        for (const torrent of torrentData.torrents) {
-            if (id === torrent.id) {
-                torrent.ratio = ratio;
-                torrent.seedTimeLeft = seedTimeLeft;
-                break;
-            }
-        }
-    }
-
-    if (page1.getElementsByClassName('pagination__link--last').length === 0 || finished) {
-        elMessage.innerHTML = `Finished loading ${page} pages from snatchlist.php.<br />Writing page.`;
-        window.setTimeout(() => showOptimization(elContent, torrentData), 1000);
-    } else {
-        window.setTimeout(() => loadSnatchlistPage(elContent, elMessage, torrentData, page + 1), 1000);
-    }
-
-    window.localStorage.bpopt = JSON.stringify(torrentData);
-};
+// -----
 
 const calcStats = torrentData => {
     const hidden = { total: 0, size: 0, bpYear: 0 };
@@ -264,6 +237,10 @@ const showOptimization = (elContent, torrentData) => {
         }
 
         torrentData.mightychefdays /= total.bpYear / target;
+        for (const t of torrentData.torrents) {
+            t.mightychefyeargb = calculateMightychefYears(t, torrentData.mightychefdays);
+        }
+
         torrentData.loops = torrentData.loops ? torrentData.loops + 1 : 1;
         window.localStorage.bpopt = JSON.stringify(torrentData);
         showOptimization(elContent, torrentData);
@@ -397,7 +374,11 @@ const showOptimization = (elContent, torrentData) => {
     const elMessage = elContent.querySelector('#bpoMessage');
     elRefresh.addEventListener('click', e => {
         e.preventDefault();
-        loadData(elContent, elMessage);
+        try {
+            loadData(elContent, elMessage);
+        } catch (ex) {
+            elMessage.innerHTML = ex.message;
+        }
     });
 
     elContent.querySelectorAll('#bpoLinks a, #bpoOptions > a').forEach(el => {
@@ -534,12 +515,6 @@ const mightychefbpyearSort = (reverse, days) => (a, b) => {
 
 // ----- Event listeners (input) -----
 
-const saveAndRedrawAfter = f => (elContent, torrentData) => {
-    f(elContent, torrentData);
-    window.localStorage.bpopt = JSON.stringify(torrentData);
-    showOptimization(elContent, torrentData);
-};
-
 const inputListeners = {
     applyCojYears: (torrentData, value) => {
         torrentData.cojyears = value;
@@ -637,6 +612,9 @@ const linkListeners = {
 
 // ----- Helpers -----
 
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const parseHTML = html => new DOMParser().parseFromString(html, 'text/html');
+
 const getPeriod = () => {
     if (!torrentData.useMightychef) return 'year';
     if (torrentData.mightychefdays === 1) return 'day';
@@ -694,11 +672,12 @@ const torrentDataStored = window.localStorage.bpopt;
 const torrentData = torrentDataStored ?
     {
         ...JSON.parse(torrentDataStored),
-        loops: 1,
         firstRun: false,
+        loops: 1,
     } :
     {
         firstRun: true,
+        loops: 1,
         cojyears: 3,
         mightychefdays: 365,
         divisor: 1,

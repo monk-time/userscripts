@@ -63,16 +63,18 @@ const firstRun = elContent => {
         </a>
     `);
 
-    const elMessage = elContent.querySelector('#bpoMessage');
     const elLink = elContent.querySelector('#bpoLoad');
-    elLink.addEventListener('click', e => {
-        e.preventDefault();
-        try {
-            loadData(elContent, elMessage);
-        } catch (ex) {
-            elMessage.innerHTML = ex.message;
-        }
-    });
+    elLink.addEventListener('click', loadDataListener(elContent));
+};
+
+const loadDataListener = elContent => e => {
+    e.preventDefault();
+    const elMessage = elContent.querySelector('#bpoMessage');
+    try {
+        loadData(elContent, elMessage);
+    } catch (ex) {
+        elMessage.innerHTML = ex.message;
+    }
 };
 
 const loadData = async (elContent, elMessage) => {
@@ -149,13 +151,13 @@ const parseBPRatePage = (elPage, torrentData) => {
             bpyear: parseFloat(tds[9].innerHTML.replaceAll(',', '')),
             bphour: parseFloat(tds[5].innerHTML.replaceAll(',', '')),
             seedTimeSeconds: tds[4].getAttribute('data-seed-seconds'),
+            hidden: false,
         };
 
         torrent.seedTimeDays = torrent.seedTimeSeconds / (60 * 60 * 24);
         torrent.bpyeargb = calculateBPYearGB(torrent);
         torrent.cojbpyeargb = calculateBPYearGBCoj(torrent, torrentData.cojyears);
         torrent.mightychefyeargb = calculateMightychefYears(torrent, torrentData.mightychefdays);
-        torrent.hidden = false;
 
         torrentData.torrents.push(torrent);
     }
@@ -210,15 +212,14 @@ const showOptimization = (elContent, torrentData) => {
 
     const { total, hidden, shown } = calcStats(torrentData);
 
-    let target = torrentData.mightychefTarget;
-    if (torrentData.useMightychef && target !== -1 && Math.round(total.bpYear * 100) !== target * 100 && torrentData.loops < 20) {
+    const target = torrentData.mightychefTarget;
+    const reachedTarget = Math.round(total.bpYear * 100) === target * 100;
+    if (torrentData.useMightychef && target !== -1 && !reachedTarget && torrentData.loops < 20) {
         const elBonus = document.querySelector('#nav_bonus a');
         const currentBP = Number(elBonus.innerHTML.match(/\d/g).join(''));
-        if (currentBP < target) {
-            target -= currentBP;
-        }
+        const target2 = target > currentBP ? target - currentBP : target;
 
-        torrentData.mightychefdays /= total.bpYear / target;
+        torrentData.mightychefdays /= total.bpYear / target2;
         for (const t of torrentData.torrents) {
             t.mightychefyeargb = calculateMightychefYears(t, torrentData.mightychefdays);
         }
@@ -232,9 +233,6 @@ const showOptimization = (elContent, torrentData) => {
     const mightychefPeriod = torrentData.mightychefdays === 1 ?
         'Day' : `${printNumber(torrentData.mightychefdays, true)} days`;
     const partPeriod = torrentData.useMightychef ? mightychefPeriod : 'Year';
-    const partBP = torrentData.divisor === 2500 ? 'GB' : 'BP';
-    const bpyear = `BP/${partPeriod}`;
-    const bpyeargb = `${partBP}/${partPeriod}/GB`;
 
     elContent.setAttribute('style', 'text-align: center;');
     elContent.innerHTML = `
@@ -248,21 +246,21 @@ const showOptimization = (elContent, torrentData) => {
                     ${total.total} torrent${total.total !== 1 ? 's' : ''} seeding,
                 </span>
                 <span>${printSize(total.size)} total.</span>
-                <span>${printNumber(total.bpYear)} BP per ${getPeriod()}.</span>
+                <span>${printNumber(total.bpYear)} BP per ${getPeriod(torrentData)}.</span>
             </div>
             <div id="bpoStatsHidden" style="display: ${hidden.total > 0 ? 'block' : 'none'};">
                 <span>
                     ${hidden.total} torrent${hidden.total !== 1 ? 's' : ''} hidden,
                 </span>
                 <span>${printSize(hidden.size)} GiB total.</span>
-                <span>${printNumber(hidden.bpYear)} BP per ${getPeriod()}.</span>
+                <span>${printNumber(hidden.bpYear)} BP per ${getPeriod(torrentData)}.</span>
             </div>
             <div id="bpoStatsShown" style="display: ${hidden.total > 0 ? 'block' : 'none'};">
                 <span>
                     ${shown.total} torrent${shown.total !== 1 ? 's' : ''} visible,
                 </span>
                 <span>${printSize(shown.size)} GiB total.</span>
-                <span>${printNumber(shown.bpYear)} BP per ${getPeriod()}.</span>
+                <span>${printNumber(shown.bpYear)} BP per ${getPeriod(torrentData)}.</span>
             </div>
         </div>
         <br>
@@ -343,9 +341,9 @@ const showOptimization = (elContent, torrentData) => {
                 </span><span class="bpoCell" style="width: 55px;">
                     <a href="#">Seeders</a>
                 </span><span class="bpoCell" style="width: 75px;">
-                    <a href="#">${bpyear}</a>
-                </span><span class="bpoCell" style="width: 75px;">
-                    <a href="#">${bpyeargb}</a>
+                    <a href="#">BP/${partPeriod}</a>
+                </span><span class="bpoCell" style="width: 77px;">
+                    <a href="#">${torrentData.divisor === 2500 ? 'GB' : 'BP'}/${partPeriod}/GB</a>
                 </span><span class="bpoCell" style="width: 30px;">
                     <a href="#">Hide</a>
                 </span>
@@ -353,15 +351,7 @@ const showOptimization = (elContent, torrentData) => {
         </div>
     `;
     const elRefresh = elContent.querySelector('#bpoRefresh');
-    const elMessage = elContent.querySelector('#bpoMessage');
-    elRefresh.addEventListener('click', e => {
-        e.preventDefault();
-        try {
-            loadData(elContent, elMessage);
-        } catch (ex) {
-            elMessage.innerHTML = ex.message;
-        }
-    });
+    elRefresh.addEventListener('click', loadDataListener(elContent));
 
     elContent.querySelectorAll('#bpoLinks a, #bpoOptions > a').forEach(el => {
         el.addEventListener('click', e => {
@@ -445,26 +435,26 @@ const showOptimization = (elContent, torrentData) => {
 // ----- Sorting -----
 
 const sortTorrents = (torrentData, sortBy) => {
-    const sortFunc = getSortFunc(sortBy, torrentData.sortBy, torrentData.useCoj, torrentData.useMightychef, torrentData.mightychefdays);
+    const sortFunc = getSortFunc(sortBy, torrentData);
     torrentData.sortBy = torrentData.sortBy === sortBy ? `${sortBy}r` : sortBy;
     torrentData.torrents.sort(sortFunc);
 };
 
-const getSortFunc = (sortBy, existingSortBy, useCoj, useMightychef) => {
-    const reverse = sortBy === existingSortBy ? -1 : 1;
-    if (useCoj && sortBy.match(/^(BP|GB)YearGBr?$/)) {
+const getSortFunc = (newSortBy, { sortBy, useCoj, useMightychef }) => {
+    const reverse = newSortBy === sortBy ? -1 : 1;
+    if (useCoj && newSortBy.match(/^(BP|GB)YearGBr?$/)) {
         return sortFuncs.CojBPYearGB(reverse);
     }
 
-    if (useMightychef && sortBy.match(/(BP|GB)\d.*GB/)) {
+    if (useMightychef && newSortBy.match(/(BP|GB)\d.*GB/)) {
         return sortFuncs.MightychefBPYearGB(reverse);
     }
 
-    if (useMightychef && sortBy.match(/BP\d/)) {
+    if (useMightychef && newSortBy.match(/BP\d/)) {
         return mightychefbpyearSort(reverse);
     }
 
-    return sortFuncs[existingSortBy](reverse);
+    return sortFuncs[newSortBy](reverse);
 };
 
 const makeKeySortFunc = (key, initialDirection = 1) => reverse => (a, b) =>
@@ -599,7 +589,7 @@ const linkListeners = {
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const parseHTML = html => new DOMParser().parseFromString(html, 'text/html');
 
-const getPeriod = () => {
+const getPeriod = torrentData => {
     if (!torrentData.useMightychef) return 'year';
     if (torrentData.mightychefdays === 1) return 'day';
 
@@ -649,53 +639,55 @@ const addCSVtoLink = (a, torrentData) => {
 
 // ----- MAIN -----
 
-// Add links to the new page on both the bonus.php and bprate.php pages
-addLinks();
+const css = `
+    .bpoHover:hover       { background: rgba(255, 255, 255, 0.2); }
+    #bpoStats             { width: 490px; margin: auto; }
+    #bpoStats span        { text-align: right; display: inline-block; }
+    #bpoStats span:not(:last-child)  { width: 130px; }
+    #bpoStats span:last-child        { margin-left: 10px; }
+    #bpoStatsHidden span:first-child { position: relative; right: 7px; }
+    #bpoStatsShown  span:first-child { position: relative; right: 9px; }
+    #bpoOptions span      { width: 300px; display: inline-block; }
+    #bpoOptions .bpoLabel { text-align: right; margin-right: 5px; }
+    #bpoOptions .bpoCont  { text-align: left; }
+    #bpoOptions input     { width: 60px; text-align: center; }
+    .bpoCell              { display: inline-block; text-align: center; overflow: hidden; }
+    #bpoHeader .bpoCell   { background: rgba(0, 0, 0, 0.2); }
+    .bpoNeedToSeed        { background: rgba(255, 0, 0, 0.2); }
+    #table.bpoShowHidden       .bpoHidden { opacity: 0.5; }
+    #table:not(.bpoShowHidden) .bpoHidden { display: none; }
+`;
 
-const torrentDataStored = window.localStorage.bpopt;
-const torrentData = torrentDataStored ?
-    {
-        ...JSON.parse(torrentDataStored),
-        firstRun: false,
-        loops: 1,
-    } :
-    {
-        firstRun: true,
-        loops: 1,
-        cojyears: 3,
-        mightychefdays: 365,
-        divisor: 1,
-        mightychefTarget: -1,
-        minimumSeedTime: 2,
-    };
+const main = () => {
+    // Add links to the new page on both the bonus.php and bprate.php pages
+    addLinks();
 
-window.localStorage.bpopt = JSON.stringify(torrentData);
+    const torrentDataStored = window.localStorage.bpopt;
+    const torrentData = torrentDataStored ?
+        {
+            ...JSON.parse(torrentDataStored),
+            firstRun: false,
+            loops: 1,
+        } :
+        {
+            firstRun: true,
+            loops: 1,
+            cojyears: 3,
+            mightychefdays: 365,
+            divisor: 1,
+            mightychefTarget: -1,
+            minimumSeedTime: 2,
+        };
 
-if (window.location.href.includes('optimization=true')) {
-    document.head.insertAdjacentHTML('beforeend', `
-        <style>
-            .bpoHover:hover       { background: rgba(255, 255, 255, 0.2); }
-            #bpoStats             { width: 490px; margin: auto; }
-            #bpoStats span        { text-align: right; display: inline-block; }
-            #bpoStats span:not(:last-child)  { width: 130px; }
-            #bpoStats span:last-child        { margin-left: 10px; }
-            #bpoStatsHidden span:first-child { position: relative; right: 7px; }
-            #bpoStatsShown  span:first-child { position: relative; right: 9px; }
-            #bpoOptions span      { width: 300px; display: inline-block; }
-            #bpoOptions .bpoLabel { text-align: right; margin-right: 5px; }
-            #bpoOptions .bpoCont  { text-align: left; }
-            #bpoOptions input     { width: 60px; text-align: center; }
-            .bpoCell              { display: inline-block; text-align: center; overflow: hidden; }
-            #bpoHeader .bpoCell   { background: rgba(0, 0, 0, 0.2); }
-            .bpoNeedToSeed        { background: rgba(255, 0, 0, 0.2); }
-            #table.bpoShowHidden       .bpoHidden { opacity: 0.5; }
-            #table:not(.bpoShowHidden) .bpoHidden { display: none; }
-        </style>
-    `);
+    window.localStorage.bpopt = JSON.stringify(torrentData);
+
+    if (!window.location.href.includes('optimization=true')) return;
+
+    document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
     // Alamak asked us not to use our own page, as 404 errors are logged.
     // Wipe the bprate page and recreate the template of the 404 page if our variable is set
     document.title = 'Bonus point optimization :: PassThePopcorn';
-    document.getElementById('content').innerHTML = `
+    document.querySelector('#content').innerHTML = `
         <div class="thin">
             <h2 class="page__title">
                 <a href="/bprate.php">BP rates</a> > Bonus point optimization
@@ -706,10 +698,10 @@ if (window.location.href.includes('optimization=true')) {
 
     const elContent = document.querySelector('.bpoContent');
     if (torrentData.firstRun) {
-        // If our local storage value isn't set, or is empty (script reset), introduce the script
         firstRun(elContent);
     } else {
-        // Otherwise show the page with cached data
         showOptimization(elContent, torrentData);
     }
-}
+};
+
+main();

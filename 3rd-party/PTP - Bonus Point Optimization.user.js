@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Bonus Point Optimization
-// @version      1.8
+// @version      2
 // @description  Chameleon's take on the BP optimization script
 // @author       Chameleon
 // @include      http*://*passthepopcorn.me/bonus.php*
@@ -12,11 +12,11 @@
 
 'use strict';
 
-const calculateBPYearGB = ({ bpyear, size }) => bpyear / (size / (1024 ** 3));
-const calculateBPYearGBCoj = (torrent, cojyears) =>
-    commonFormula(torrent, 365.2422 * cojyears, 1 / cojyears);
-const calculateMightychefYears = (torrent, mightychefdays) =>
-    commonFormula(torrent, mightychefdays, 1);
+const calculateBPYearGB = ({ bpYear, size }) => bpYear / (size / (1024 ** 3));
+const calculateBPYearGBCoj = (torrent, cojYears) =>
+    commonFormula(torrent, 365.2422 * cojYears, 1 / cojYears);
+const calculateBPDaysGBMightychef = (torrent, mightychefDays) =>
+    commonFormula(torrent, mightychefDays, 1);
 
 const commonFormula = ({ gp, seedTimeDays: t, seeders }, d, algQ) => {
     const s = 2.4 * (seeders ** -0.6);
@@ -78,7 +78,7 @@ const loadDataListener = elContent => e => {
 };
 
 const loadData = async (elContent, elMessage) => {
-    const torrentData = JSON.parse(window.localStorage.bpopt);
+    const torrentData = JSON.parse(window.localStorage.bpopt2);
     torrentData.torrents = [];
 
     let bpRatePagesTotal;
@@ -116,7 +116,7 @@ const loadData = async (elContent, elMessage) => {
         if (!snatchlistPagesTotal) throw new Error('Unexpected number of pages on snatchlist.php');
     } while (snatchlistPageNum <= snatchlistPagesTotal);
 
-    window.localStorage.bpopt = JSON.stringify(torrentData);
+    window.localStorage.bpopt2 = JSON.stringify(torrentData);
     showOptimization(elContent, torrentData);
 };
 
@@ -148,16 +148,17 @@ const parseBPRatePage = (elPage, torrentData) => {
             size: parseSize(tds[2].innerHTML.replaceAll(',', '')),
             seeders: parseInt(tds[3].innerHTML.replaceAll(',', ''), 10),
             ratio: parseFloat(tds[6].innerHTML.replaceAll(',', '')),
-            bpyear: parseFloat(tds[9].innerHTML.replaceAll(',', '')),
-            bphour: parseFloat(tds[5].innerHTML.replaceAll(',', '')),
+            bpYear: parseFloat(tds[9].innerHTML.replaceAll(',', '')),
+            bpHour: parseFloat(tds[5].innerHTML.replaceAll(',', '')),
             seedTimeSeconds: tds[4].getAttribute('data-seed-seconds'),
             hidden: false,
         };
 
         torrent.seedTimeDays = torrent.seedTimeSeconds / (60 * 60 * 24);
-        torrent.bpyeargb = calculateBPYearGB(torrent);
-        torrent.cojbpyeargb = calculateBPYearGBCoj(torrent, torrentData.cojyears);
-        torrent.mightychefyeargb = calculateMightychefYears(torrent, torrentData.mightychefdays);
+        torrent.bpYearGB = calculateBPYearGB(torrent);
+        torrent.bpYearGBCoj = calculateBPYearGBCoj(torrent, torrentData.cojYears);
+        torrent.bpDaysGBMightychef =
+            calculateBPDaysGBMightychef(torrent, torrentData.mightychefDays);
 
         torrentData.torrents.push(torrent);
     }
@@ -190,7 +191,7 @@ const calcStats = torrentData => {
         const target = t.hidden ? hidden : shown;
         target.total++;
         target.size += t.size;
-        target.bpYear += torrentData.useMightychef ? t.mightychefyeargb : t.bpyear;
+        target.bpYear += torrentData.useMightychef ? t.bpDaysGBMightychef : t.bpYear;
     }
 
     const total = {
@@ -204,34 +205,29 @@ const calcStats = torrentData => {
 
 // eslint-disable-next-line complexity
 const showOptimization = (elContent, torrentData) => {
-    if (!torrentData.torrents?.length > 0) {
-        window.localStorage.removeItem('bpopt');
-        firstRun(elContent);
-        return;
-    }
-
     const { total, hidden, shown } = calcStats(torrentData);
 
-    const target = torrentData.mightychefTarget;
-    const reachedTarget = Math.round(total.bpYear * 100) === target * 100;
-    if (torrentData.useMightychef && target !== -1 && !reachedTarget && torrentData.loops < 20) {
+    const targetBP = torrentData.mightychefTargetBP;
+    const reachedTarget = Math.round(total.bpYear * 100) === targetBP * 100;
+    if (torrentData.useMightychef && targetBP !== -1 && !reachedTarget && torrentData.loops < 20) {
+        console.log(`in the weird loop; loops=${torrentData.loops}`);
         const elBonus = document.querySelector('#nav_bonus a');
         const currentBP = Number(elBonus.innerHTML.match(/\d/g).join(''));
-        const target2 = target > currentBP ? target - currentBP : target;
+        const targetBP2 = targetBP > currentBP ? targetBP - currentBP : targetBP;
 
-        torrentData.mightychefdays /= total.bpYear / target2;
+        torrentData.mightychefDays /= total.bpYear / targetBP2;
         for (const t of torrentData.torrents) {
-            t.mightychefyeargb = calculateMightychefYears(t, torrentData.mightychefdays);
+            t.bpDaysGBMightychef = calculateBPDaysGBMightychef(t, torrentData.mightychefDays);
         }
 
         torrentData.loops = torrentData.loops ? torrentData.loops + 1 : 1;
-        window.localStorage.bpopt = JSON.stringify(torrentData);
+        window.localStorage.bpopt2 = JSON.stringify(torrentData);
         showOptimization(elContent, torrentData);
         return;
     }
 
-    const mightychefPeriod = torrentData.mightychefdays === 1 ?
-        'Day' : `${printNumber(torrentData.mightychefdays, true)} days`;
+    const mightychefPeriod = torrentData.mightychefDays === 1 ?
+        'Day' : `${printNumber(torrentData.mightychefDays, true)} days`;
     const partPeriod = torrentData.useMightychef ? mightychefPeriod : 'Year';
 
     elContent.setAttribute('style', 'text-align: center;');
@@ -296,14 +292,14 @@ const showOptimization = (elContent, torrentData) => {
             <br>
             <span class="bpoLabel">coj Years averaged over:</span>
             <span class="bpoCont">
-                <input type="number" value="${torrentData.cojyears}">
+                <input type="number" value="${torrentData.cojYears}">
                 <a id="applyCojYears" href="#">Apply</a>
             </span>
             <br>
             <span class="bpoLabel">mightychef days:</span>
             <span class="bpoCont">
-                <input type="number" value="${torrentData.mightychefdays}">
-                <a id="applyMightychefYears" href="#">Apply</a>
+                <input type="number" value="${torrentData.mightychefDays}">
+                <a id="applyMightychefDays" href="#">Apply</a>
             </span>
             <br>
             <span class="bpoLabel">BP/Year/GB divisor (2500 for GB/Year/GB):</span>
@@ -314,8 +310,8 @@ const showOptimization = (elContent, torrentData) => {
             <br>
             <span class="bpoLabel">mightychef target:</span>
             <span class="bpoCont">
-                <input type="number" value="${torrentData.mightychefTarget}">
-                <a id="applyMightychefTarget" href="#">Apply</a>
+                <input type="number" value="${torrentData.mightychefTargetBP}">
+                <a id="applyMightychefTargetBP" href="#">Apply</a>
             </span>
             <br>
             <span class="bpoLabel">Minimum seed time (days):</span>
@@ -357,7 +353,7 @@ const showOptimization = (elContent, torrentData) => {
         el.addEventListener('click', e => {
             e.preventDefault();
             linkListeners[el.id](torrentData);
-            window.localStorage.bpopt = JSON.stringify(torrentData);
+            window.localStorage.bpopt2 = JSON.stringify(torrentData);
             showOptimization(elContent, torrentData);
         });
     });
@@ -368,7 +364,7 @@ const showOptimization = (elContent, torrentData) => {
             e.preventDefault();
             if (Number.isNaN(input.valueAsNumber)) return;
             inputListeners[el.id](torrentData, input.valueAsNumber);
-            window.localStorage.bpopt = JSON.stringify(torrentData);
+            window.localStorage.bpopt2 = JSON.stringify(torrentData);
             showOptimization(elContent, torrentData);
         });
     });
@@ -380,7 +376,7 @@ const showOptimization = (elContent, torrentData) => {
             e.preventDefault();
             const sortBy = el.innerHTML.replace(/[/, ]/g, '');
             sortTorrents(torrentData, sortBy);
-            window.localStorage.bpopt = JSON.stringify(torrentData);
+            window.localStorage.bpopt2 = JSON.stringify(torrentData);
             showOptimization(elContent, torrentData);
         });
     });
@@ -391,11 +387,11 @@ const showOptimization = (elContent, torrentData) => {
         const remaining = Math.round((mST - days) * 100) / 100;
         const needToSeed = (mST > 0 && days < mST) || (mST <= 0 && days > -mST);
 
-        const bpyearRawValue = torrentData.useMightychef ?
-            t.mightychefyeargb * (t.size / (1024 ** 3)) : t.bpyear;
-        const bpyeargbRawValue = torrentData.useMightychef ?
-            t.mightychefyeargb :
-            torrentData.useCoj ? t.cojbpyeargb : t.bpyeargb;
+        const bpPeriodRawValue = torrentData.useMightychef ?
+            t.bpDaysGBMightychef * (t.size / (1024 ** 3)) : t.bpYear;
+        const bpPeriodGBRawValue = torrentData.useMightychef ?
+            t.bpDaysGBMightychef :
+            torrentData.useCoj ? t.bpYearGBCoj : t.bpYearGB;
 
         elTable.insertAdjacentHTML('beforeend', `
             <div class="bpoRow bpoHover ${t.hidden ? 'bpoHidden' : ''} ${needToSeed ? 'bpoNeedToSeed' : ''}" ${mST > 0 && days < mST ? `title="Seed time remaining: ${remaining}"` : ''}>
@@ -412,9 +408,9 @@ const showOptimization = (elContent, torrentData) => {
                 </span><span class="bpoCell" style="width: 55px;">
                     ${printNumber(t.seeders, true)}
                 </span><span class="bpoCell" style="width: 75px;">
-                    ${printNumber(bpyearRawValue)}
+                    ${printNumber(bpPeriodRawValue)}
                 </span><span class="bpoCell" style="width: 75px;">
-                    ${printNumber(bpyeargbRawValue / torrentData.divisor)}
+                    ${printNumber(bpPeriodGBRawValue / torrentData.divisor)}
                 </span><span class="bpoCell" style="width: 30px;">
                     <a href="javascript:void(0);">X</a>
                 </span>
@@ -447,11 +443,11 @@ const getSortFunc = (newSortBy, { sortBy, useCoj, useMightychef }) => {
     }
 
     if (useMightychef && newSortBy.match(/(BP|GB)\d.*GB/)) {
-        return sortFuncs.MightychefBPYearGB(reverse);
+        return sortFuncs.MightychefBPDaysGB(reverse);
     }
 
     if (useMightychef && newSortBy.match(/BP\d/)) {
-        return mightychefbpyearSort(reverse);
+        return mightychefBPDaysSort(reverse);
     }
 
     return sortFuncs[newSortBy](reverse);
@@ -471,19 +467,19 @@ const sortFuncs = {
     GP: makeKeySortFunc('gp', -1),
     Size: makeKeySortFunc('size', -1),
     Seeders: makeKeySortFunc('seeders', -1),
-    BPYear: makeKeySortFunc('bpyear'),
-    BPYearGB: makeKeySortFunc('bpyeargb'),
-    GBYearGB: makeKeySortFunc('bpyeargb'),
-    MightychefBPYearGB: makeKeySortFunc('mightychefyeargb'),
-    CojBPYearGB: makeKeySortFunc('cojbpyeargb'),
+    BPYear: makeKeySortFunc('bpYear'),
+    BPYearGB: makeKeySortFunc('bpYearGB'),
+    GBYearGB: makeKeySortFunc('bpYearGB'),
+    MightychefBPDaysGB: makeKeySortFunc('bpDaysGBMightychef'),
+    CojBPYearGB: makeKeySortFunc('bpYearGBCoj'),
     Hide: makeKeySortFunc('hidden'),
     SeedTime: makeKeySortFunc('seedTimeDays'),
     Ratio: reverse => (a, b) => reverse * (getRatioKey(b.ratio) - getRatioKey(a.ratio)),
     Title: reverse => (a, b) => reverse * a.title.localeCompare(b.title),
 };
 
-const mightychefbpyearSort = reverse => (a, b) => {
-    const getKey = x => x.mightychefyeargb * (x.size / (1024 ** 3));
+const mightychefBPDaysSort = reverse => (a, b) => {
+    const getKey = x => x.bpDaysGBMightychef * (x.size / (1024 ** 3));
     return reverse * (getKey(a) - getKey(b));
 };
 
@@ -491,22 +487,22 @@ const mightychefbpyearSort = reverse => (a, b) => {
 
 const inputListeners = {
     applyCojYears: (torrentData, value) => {
-        torrentData.cojyears = value;
+        torrentData.cojYears = value;
         for (const torrent of torrentData.torrents) {
-            torrent.cojbpyeargb = calculateBPYearGBCoj(torrent, value);
+            torrent.bpYearGBCoj = calculateBPYearGBCoj(torrent, value);
         }
     },
-    applyMightychefYears: (torrentData, value) => {
-        torrentData.mightychefdays = value;
+    applyMightychefDays: (torrentData, value) => {
+        torrentData.mightychefDays = value;
         for (const torrent of torrentData.torrents) {
-            torrent.mightychefyeargb = calculateMightychefYears(torrent, value);
+            torrent.bpDaysGBMightychef = calculateBPDaysGBMightychef(torrent, value);
         }
     },
     applyDivisor: (torrentData, value) => {
         torrentData.divisor = value;
     },
-    applyMightychefTarget: (torrentData, value) => {
-        torrentData.mightychefTarget = value;
+    applyMightychefTargetBP: (torrentData, value) => {
+        torrentData.mightychefTargetBP = value;
         torrentData.loops = 0;
     },
     applyMinimumSeedTime: (torrentData, value) => {
@@ -516,7 +512,7 @@ const inputListeners = {
 
 const hideTorrent = (torrent, elContent, torrentData) => {
     torrent.hidden = !torrent.hidden;
-    window.localStorage.bpopt = JSON.stringify(torrentData);
+    window.localStorage.bpopt2 = JSON.stringify(torrentData);
     showOptimization(elContent, torrentData);
 };
 
@@ -591,14 +587,14 @@ const parseHTML = html => new DOMParser().parseFromString(html, 'text/html');
 
 const getPeriod = torrentData => {
     if (!torrentData.useMightychef) return 'year';
-    if (torrentData.mightychefdays === 1) return 'day';
+    if (torrentData.mightychefDays === 1) return 'day';
 
-    const hours = (torrentData.mightychefdays % 1) * 24;
+    const hours = (torrentData.mightychefDays % 1) * 24;
     const minutes = (hours % 1) * 60;
     const seconds = Math.round((minutes % 1) * 60);
     return hours === 0 && minutes === 0 && seconds === 0 ?
-        `${torrentData.mightychefdays} days` :
-        `${Math.floor(torrentData.mightychefdays)} days, ${Math.floor(hours)} hours, ${Math.floor(minutes)} minutes, and ${seconds} seconds`;
+        `${torrentData.mightychefDays} days` :
+        `${Math.floor(torrentData.mightychefDays)} days, ${Math.floor(hours)} hours, ${Math.floor(minutes)} minutes, and ${seconds} seconds`;
 };
 
 const printNumber = (number, asInteger) => number.toLocaleString('en-US', {
@@ -624,8 +620,8 @@ const addCSVtoLink = (a, torrentData) => {
     a.innerHTML = `Generating ${torrentData.torrents.length} rows`;
 
     const fields = [
-        'id', 'link', 'title', 'gp', 'size', 'seeders', 'ratio', 'bpyear', 'bphour',
-        'seedtimeseconds', 'bpyeargb', 'cojbpyeargb', 'mightychefyeargb', 'seedTimeDays',
+        'id', 'link', 'title', 'gp', 'size', 'seeders', 'ratio', 'bpYear', 'bpHour',
+        'seedtimeseconds', 'bpYearGB', 'bpYearGBCoj', 'bpDaysGBMightychef', 'seedTimeDays',
         'hidden', 'seedTimeLeft',
     ];
     let text = `${fields.map(f => `"${f}"`).join(',')}\n`;
@@ -662,7 +658,7 @@ const main = () => {
     // Add links to the new page on both the bonus.php and bprate.php pages
     addLinks();
 
-    const torrentDataStored = window.localStorage.bpopt;
+    const torrentDataStored = window.localStorage.bpopt2;
     const torrentData = torrentDataStored ?
         {
             ...JSON.parse(torrentDataStored),
@@ -672,14 +668,14 @@ const main = () => {
         {
             firstRun: true,
             loops: 1,
-            cojyears: 3,
-            mightychefdays: 365,
+            cojYears: 3,
+            mightychefDays: 365,
             divisor: 1,
-            mightychefTarget: -1,
+            mightychefTargetBP: -1,
             minimumSeedTime: 2,
         };
 
-    window.localStorage.bpopt = JSON.stringify(torrentData);
+    window.localStorage.bpopt2 = JSON.stringify(torrentData);
 
     if (!window.location.href.includes('optimization=true')) return;
 

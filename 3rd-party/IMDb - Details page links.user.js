@@ -25,7 +25,7 @@ const urlTemplates = [
     ['iCheckMovies', 'https://www.icheckmovies.com/search/movies/?query={imdbid}'],
     ['Wikipedia', 'https://en.wikipedia.org/w/index.php?title=Special:Search&search={title}'],
     ['RYM', 'http://rateyourmusic.com/search?searchterm={title}&searchtype=F'],
-    ['KinoPoisk', 'https://www.kinopoisk.ru/index.php?level=7&from=forma&result=adv&m_act[from]=forma&m_act[what]=content&m_act[find]={title_plused}&m_act[from_year]={year_min}&m_act[to_year]={year_max}'],
+    ['Letterboxd', 'https://letterboxd.com/search/films/{imdbid}'],
     [],
     ['RuTracker', 'https://rutracker.net/forum/tracker.php?nm={title_plain} {year}&o=7&s=2'],
     ['Kinozal', 'http://kinozal.tv/browse.php?s={title_plused}+{year}'],
@@ -36,10 +36,11 @@ const urlTemplates = [
     ['OpenSubtitles', 'https://www.opensubtitles.org/en/search2/sublanguageid-eng/subsumcd-1/imdbid-{imdbid}'],
     ['YouTube', 'https://www.youtube.com/results?search_query={title} {year}'],
     [],
+    ['KinoPoisk', 'https://www.kinopoisk.ru/index.php?level=7&from=forma&result=adv&m_act[from]=forma&m_act[what]=content&m_act[find]={title_plused}&m_act[from_year]={year_min}&m_act[to_year]={year_max}'],
     ['Reddit', 'https://www.reddit.com/r/gamerghazi+truefilm/search?q={title}&restrict_sr=on&include_over_18=on&sort=comments&t=all'],
     ['ФЭР', 'https://www.google.com/search?q=site:club443.ru %22{title}%22'],
     ['RottenTomatoes', 'https://www.rottentomatoes.com/search/?search={title_plain}'],
-    ['Letterboxd', 'https://letterboxd.com/search/films/{imdbid}'],
+
     ['Google', 'https://www.google.com/search?q={title} {year}'],
     ['MUBI', 'https://www.google.com/search?q=site:mubi.com {title} {year}'],
     ['WhatTheMovie', 'https://whatthemovie.com/search?t=movie&q={imdbid}'],
@@ -169,6 +170,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 </style>`);
 
 const addLinkbar = () => {
+    if (document.querySelector('#dpl-linkbar')) return;
     const linkbar = document.createElement('div');
     linkbar.id = 'dpl-linkbar';
 
@@ -228,5 +230,6 @@ const fixHeaderLink = () => {
 };
 
 const movieInfo = parseMovieInfo();
-addLinkbar();
 fixHeaderLink();
+addLinkbar();
+setInterval(addLinkbar, 2000);

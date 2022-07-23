@@ -225,7 +225,7 @@ const parseMovieInfo = () => {
 
 // Extra: make the whole title clickable
 const fixHeaderLink = () => {
-    const elHeader = document.querySelector('[class^=TitleHeader__TitleText]');
+    const elHeader = document.querySelector('[data-testid=hero-title-block__title]');
     elHeader.innerHTML = `<a href="${document.URL}" class="dpl-header">${elHeader.innerHTML}</a>`;
 };
 

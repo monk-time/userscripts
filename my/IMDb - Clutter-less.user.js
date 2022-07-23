@@ -28,7 +28,7 @@ const mainSections = [
 // ----- Main -----
 
 const hideMainSections = () => {
-    const elMain = document.querySelector('[class^=TitleMainBelowTheFoldGroup__TitleMainPrimaryGroup]');
+    const elMain = document.querySelector('main');
     if (!elMain) return;
     const elSections = [...elMain.querySelectorAll('section.ipc-page-section.ipc-page-section--base')];
     const getSectionHeaderText = el => el.querySelector('.ipc-title__text')?.childNodes[0].textContent;
@@ -50,22 +50,42 @@ const hideFooterSections = () => {
 
 const reMovie = /imdb\.com\/title\/tt\d+/;
 const reName = /imdb\.com\/name\/nm\d+/;
-const [isOnMoviePage, isOnNamePage] = [reMovie, reName]
-    .map(re => re.test(document.location.href));
+const isOnPage = re => re.test(document.location.href);
+const isOnMoviePage = isOnPage(reMovie);
+const isOnNamePage = isOnPage(reName);
 
-const hideSectionsInSidebar = () => {
+const hideSidebarSections = () => {
     if (!isOnMoviePage && !isOnNamePage) return;
 
-    const elMain = document.querySelector('[class^=TitleMainBelowTheFoldGroup__SidebarContainer]');
-    if (!elMain) return;
-    elMain.querySelectorAll('hgroup[data-testid="right-rail-more-to-explore"], [class^=SidebarSlot]')
-        .forEach(el => {
+    const elSidebarHeader = [...document.querySelectorAll('main section > hgroup')]
+        .find(el => el.textContent.trim() === 'More to explore');
+    if (!elSidebarHeader) {
+        console.error('No sidebar header found');
+        return;
+    }
+
+    const elSidebar = elSidebarHeader.nextElementSibling;
+    const hideIfNotUserLists = el => {
+        // Hide all sections that are not user lists
+        // Sections are selected explicity, selecting all non-matching breaks delayed loading
+        if (el.dataset.testid === 'SidebarPolls' ||
+            el.querySelector('.imdb-editorial-single')
+        ) {
             el.style.display = 'none';
-        });
+        }
+    };
+
+    [...elSidebar.children].forEach(hideIfNotUserLists);
+    // IMDb doesn't load all sections on page load but adds them later
+    const mut = new MutationObserver(mutList => mutList.forEach(({ addedNodes }) => {
+        if (!addedNodes.length) return;
+        addedNodes.forEach(hideIfNotUserLists);
+    }));
+    mut.observe(elSidebar, { childList: true });
 };
 
 hideMainSections();
 hideFooterSections();
-hideSectionsInSidebar();
+hideSidebarSections();
 
 console.log('IMDb has been cleaned up!');

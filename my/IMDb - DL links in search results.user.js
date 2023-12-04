@@ -2,7 +2,7 @@
 // @name        IMDb - DL links in search results
 // @namespace   monk-time
 // @author      monk-time
-// @include     https://www.imdb.com/search/title/?lists=watchlist&sort=num_votes,desc&view=simple
+// @include     https://www.imdb.com/search/title/*
 // @icon        http://www.imdb.com/favicon.ico
 // ==/UserScript==
 
@@ -106,11 +106,11 @@ const removeDiacritics = s => s
 const resources = [
     {
         label: 'RTO',
-        url: 'https://rutracker.net/forum/tracker.php?nm={titleLat} {year}&o=7&s=2',
+        url: 'https://rutracker.net/forum/tracker.php?nm={titleLat} {year} -DVD5 -DVD9&o=7&s=2',
         color: '#428442',
     }, {
         label: 'KZ',
-        url: 'http://kinozal.tv/browse.php?s={titleLat} {year}',
+        url: 'https://kinozal.me/browse.php?s={titleLat} {year}',
         color: '#E0923F',
     }, {
         label: 'PTP',
@@ -132,13 +132,16 @@ const resources = [
 ];
 
 const btnStyles = resources.map(({ label, color }) => `
-    a.userscript-${label.toLowerCase()} {
+    .userscript-${label.toLowerCase()} {
         background-color: ${color};
     }
 `).join('');
 
 document.head.insertAdjacentHTML('beforeend', `<style>
-    a.userscript-btn {
+    #idll-trigger {
+        background-color: #DD00AA;
+    }
+    .userscript-btn {
         color: #FFF;
         font-size: 12px;
         font-family: Calibri;
@@ -161,39 +164,49 @@ const buildFullURL = (template, dataObj) => {
     return template.replace('\'', '&#39;');
 };
 
-const titleElements = [...document.querySelectorAll('.lister-item-header')];
-
-const parseMovie = el => {
-    const linkEl = el.querySelector('a');
+const parseMovie = titleEl => {
+    const linkEl = titleEl.querySelector('a.ipc-title-link-wrapper');
     const id = linkEl.href.match(/(tt[0-9]+)/)[0];
     const nottid = id.replace('tt', '');
-    const year = linkEl.nextElementSibling.textContent.match(/\d{4}/)[0];
-    const titleLat = encodeURIComponent(removeDiacritics(linkEl.textContent.trim()));
+    const year = titleEl.querySelector('.cli-title-metadata, .dli-title-metadata')
+        .textContent.match(/\d{4}/)[0];
+    const title = linkEl.textContent.match(/^\d+\. (.+)/)[1].trim();
+    const titleLat = encodeURIComponent(removeDiacritics(title));
     const titlePlus = titleLat.replace(/%20/g, '+');
-    return { id, nottid, year, titleLat, titlePlus };
+    return { id, nottid, year, title, titleLat, titlePlus };
 };
 
+// Add link-buttons
 const createButtons = movie => resources.map(({ label, url }) =>
     `<a href='${buildFullURL(url, movie)}'
         class='userscript-btn userscript-${label.toLowerCase()}'>${label}</a>`);
 
-const textList = titleElements.map(el => {
-    const title = el.querySelector('a').textContent.trim();
-    const year = el.querySelector('.lister-item-year').textContent.trim();
-    const fname = `${title} ${year}`;
+const insertButtons = titleEl => {
+    const buttons = createButtons(parseMovie(titleEl)).join('');
+    titleEl.querySelector('.ipc-title').insertAdjacentHTML('afterbegin', buttons);
+};
+
+const movieToPlaintext = titleEl => {
+    const { title, year } = parseMovie(titleEl);
+    const fname = `${title} (${year})`;
     const fnameANSI = removeDiacritics(fname)
         .replace(/["*<>?|/\\]/g, '-')
         .replace(/:/g, ' -');
 
     return fname === fnameANSI ? fname : `${fnameANSI}\t${fname}`;
-}).join('\n');
+};
 
-// Add link-buttons
-for (const el of titleElements) {
-    const buttons = createButtons(parseMovie(el)).join('');
-    el.querySelector('a').insertAdjacentHTML('beforebegin', buttons);
-}
+const main = () => {
+    const titleElements = [...document.querySelectorAll('.ipc-metadata-list-summary-item')];
+    titleElements.forEach(insertButtons);
 
-// Add utorrent-friendly torrent titles
-document.querySelector('#main > .article')
-    .insertAdjacentHTML('afterend', `<pre>${textList}</pre>`);
+    // Add utorrent-friendly torrent titles
+    const textList = titleElements.map(movieToPlaintext).join('\n');
+    container.insertAdjacentHTML('afterend', `<pre>${textList}</pre>`);
+};
+
+const container = document.querySelector('.ipc-page-section > h2');
+container.insertAdjacentHTML('afterend', `
+    <button id='idll-trigger' class='userscript-btn'>Add DL links</button>
+`);
+document.querySelector('#idll-trigger').addEventListener('click', main);

@@ -205,7 +205,7 @@ const main = () => {
     container.insertAdjacentHTML('afterend', `<pre>${textList}</pre>`);
 };
 
-const container = document.querySelector('.ipc-page-section > h2');
+const container = document.querySelector('.ipc-page-section > .ipc-title');
 container.insertAdjacentHTML('afterend', `
     <button id='idll-trigger' class='userscript-btn'>Add DL links</button>
 `);

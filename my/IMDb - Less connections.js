@@ -8,19 +8,34 @@
 
 'use strict';
 
-const elContainer = document.querySelector('#connections_content > .list');
-// Reverse order simplifies getHeader significantly
-const items = [...elContainer.children].map((el, i) => ({ el, i })).reverse();
-const headers = items.filter(({ el }) => el.tagName === 'H4');
-const getHeader = j => headers.find(({ i }) => i < j);
-const re = /\((TV Episode|TV Mini-Series|TV Series|TV Movie|TV Short|Video Game|Video)\)/;
+const elContainer = document.querySelector('.ipc-page-grid__item--span-2');
+const badTypes = [
+    'TV Episode',
+    'TV Mini-Series',
+    'TV Series',
+    'TV Movie',
+    'TV Short',
+    'TV Special',
+    'Video Game',
+    'Video',
+    'Podcast Episode',
+];
+const re = new RegExp(`\\(${badTypes.join('|')}`);
 
-for (const { el, i } of items) {
-    if (!el.classList.contains('soda')) continue;
-    if (!el.querySelector('.mme-with-tooltip')) {
-        if (re.test(el.textContent)) el.remove();
-        continue;
+const removeConnections = () => {
+    const items = elContainer.querySelectorAll('.ipc-metadata-list__item');
+    for (const el of items) {
+        if (re.test(el.textContent)) {
+            el.remove();
+        }
     }
+};
 
-    getHeader(i).el.insertAdjacentElement('afterend', el);
-}
+removeConnections();
+
+const mut = new MutationObserver(mutList => mutList.forEach(({ addedNodes }) => {
+    console.log('Mutated', addedNodes);
+    if (!addedNodes.length) return;
+    removeConnections();
+}));
+mut.observe(elContainer, { childList: true, subtree: true });

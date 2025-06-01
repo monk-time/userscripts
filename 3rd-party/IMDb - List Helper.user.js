@@ -3,12 +3,10 @@
 // @description    Makes creating IMDb lists more efficient and convenient
 // @namespace      imdb
 // @author         themagician, monk-time
-// @include        http://*imdb.com/list/*/edit
 // @include        https://*imdb.com/list/*/edit
-// @include        http://*imdb.com/list/*/edit?*
-// @include        https://*imdb.com/list/*/edit?*
+// @include        https://*imdb.com/list/*/edit/
 // @require        https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
-// @icon           http://www.imdb.com/favicon.ico
+// @icon           https://www.imdb.com/favicon.ico
 // @version        3.1.1
 // ==/UserScript==
 
@@ -77,7 +75,7 @@ const REQUEST_DELAY = 1000;
 
 document.head.insertAdjacentHTML('beforeend', `<style>
     #ilh-ui {
-        margin: 0 5% 5% 5%;
+        margin: 0 0 5% 0;
         padding: 10px;
         border: 1px solid #e8e8e8;
     }
@@ -113,19 +111,19 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 </style>`);
 
 const searchModeHints = {
-    auto:   'Input titles, IMDb URLs or IDs here and click Start. ' +
-            'If a line has an IMDb ID, it\'ll be auto-added to the list. ' +
-            'Otherwise the whole line will be searched for, ' +
-            'and you\'ll have to select the correct title manually.',
+    auto: 'Input titles, IMDb URLs or IDs here and click Start. ' +
+        'If a line has an IMDb ID, it\'ll be auto-added to the list. ' +
+        'Otherwise the whole line will be searched for, ' +
+        'and you\'ll have to select the correct title manually.',
     imdbid: 'Input text containing IMDb IDs here and click Start. ' +
-            'IMDb IDs are extracted from lines (only one per line) and ' +
-            'auto-added to the list, skipping the rest.',
-    line:   'Input titles or IMDb IDs here and click Start. ' +
-            'Whole lines are used for search, nothing is skipped.',
+        'IMDb IDs are extracted from lines (only one per line) and ' +
+        'auto-added to the list, skipping the rest.',
+    line: 'Input titles or IMDb IDs here and click Start. ' +
+        'Whole lines are used for search, nothing is skipped.',
     regexp: 'Input text here and click Start. Only captured groups of regex matches ' +
-            'are used for search.',
+        'are used for search.',
     rating: 'Use the controls below to load data from a file or input text here and click Start. ' +
-            'Your rating and IMDb ID/title is extracted from each line with regex.',
+        'Your rating and IMDb ID/title is extracted from each line with regex.',
 };
 
 const uiHTML = `
@@ -174,7 +172,8 @@ const uiHTML = `
         </div>
     </div>`;
 
-document.querySelector('div.lister-search').insertAdjacentHTML('afterend', uiHTML);
+document.querySelector('div[data-testid=add-const-to-list-container]')
+    .insertAdjacentHTML('afterend', uiHTML);
 
 const innerIDs = [
     'mode-list',
@@ -202,8 +201,8 @@ const ui = Object.assign(...innerIDs.map(id => ({
 })));
 
 ui.freezables = [ui.modeList, ui.modeRatings, ui.filmList, ui.start, ui.regexp, ui.searchMode];
-const elIMDbSearch = document.getElementById('add-to-list-search');
-const elIMDbResults = document.getElementById('add-to-list-search-results');
+const elIMDbSearch = document.querySelector('input[data-testid="entity-autocomplete-input"]');
+const elIMDbResults = document.getElementById('react-autowhatever-1');
 
 // ----- HANDLERS AND ACTIONS -----
 
@@ -279,9 +278,9 @@ const ListManager = {
     match: (line, mode, regex) => ({
         /* eslint-disable no-sparse-arrays */
         // 'auto' - search for an id (if a string has one) or for a full non-empty string
-        auto:   s => ListManager.regex.exec(s) || s && [, s],
+        auto: s => ListManager.regex.exec(s) || (s && [, s]),
         imdbid: s => ListManager.regex.exec(s),
-        line:   s => s && [, s],
+        line: s => s && [, s],
         regexp: s => regex.exec(s),
         /* eslint-enable no-sparse-arrays */
     })[mode](line),

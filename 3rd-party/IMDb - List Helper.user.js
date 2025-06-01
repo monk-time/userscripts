@@ -3,15 +3,19 @@
 // @description    Makes creating IMDb lists more efficient and convenient
 // @namespace      imdb
 // @author         themagician, monk-time
-// @include        https://*imdb.com/list/*/edit
 // @include        https://*imdb.com/list/*/edit/
-// @require        https://cdnjs.cloudflare.com/ajax/libs/d3-dsv/1.0.8/d3-dsv.min.js
 // @icon           https://www.imdb.com/favicon.ico
-// @version        3.1.1
+// @version        3.2
 // ==/UserScript==
 
 //
 // CHANGELOG
+//
+// 3.2
+// fixed: Support IMDb's new GraphQL API by sending requests directly instead of using the form
+//        (I couldn't figure out how to use the React form through JS).
+//        You have to update the page manually to see the changes
+// removed: Had to remove the ability to import ratings as it didn't work anyway
 //
 // 3.1.1
 // fixed: Support HTTPS pages
@@ -63,8 +67,6 @@
 // 1.6.1.1
 // fixed: some entries are skipped when adding imdb ids/urls
 //
-
-/* global d3 */
 
 'use strict';
 
@@ -122,24 +124,13 @@ const searchModeHints = {
         'Whole lines are used for search, nothing is skipped.',
     regexp: 'Input text here and click Start. Only captured groups of regex matches ' +
         'are used for search.',
-    rating: 'Use the controls below to load data from a file or input text here and click Start. ' +
-        'Your rating and IMDb ID/title is extracted from each line with regex.',
 };
 
 const uiHTML = `
     <div id="ilh-ui">
-        <div class="ilh-block">
-            <label>Import mode:</label>
-            <input type="radio" id="ilh-mode-list" name="mode" value="list" checked>
-            <label for="ilh-mode-list">List</label>
-            <input type="radio" id="ilh-mode-ratings" name="mode" value="ratings">
-            <label for="ilh-mode-ratings">Ratings</label>
-        </div>
         <textarea id="ilh-film-list" rows="7" placeholder="${searchModeHints.auto}"></textarea>
         <div>
             <input type="button" value="Start" id="ilh-start">
-            <input type="button" value="Skip"  id="ilh-skip">
-            <input type="button" value="Retry" id="ilh-retry">
             <span>Remaining: <span id="ilh-films-remaining">0</span></span>
         </div>
         <div class="ilh-block">
@@ -159,38 +150,20 @@ const uiHTML = `
                 <option value="regexp">Regexp</option>
             </select>
         </div>
-        <div id="ilh-import" style="display: none">
-            <label for="ilh-import-sel">Import .csv from:</label>
-            <select name="import" id="ilh-import-sel">
-                <option value="" selected disabled hidden>Select</option>
-                <option value="imdb">IMDb</option>
-                <option value="rym">RateYourMusic</option>
-                <option value="criticker">Criticker</option>
-            </select>
-            <span>File:</span>
-            <input type="file" id="ilh-file-import" disabled>
-        </div>
     </div>`;
 
 document.querySelector('div[data-testid=add-const-to-list-container]')
     .insertAdjacentHTML('afterend', uiHTML);
 
 const innerIDs = [
-    'mode-list',
-    'mode-ratings',
     'film-list',
     'start',
-    'skip',
-    'retry',
     'films-remaining',
     'current-film',
     'search-mode-box',
     'search-mode',
     'regexp-box',
     'regexp',
-    'import',
-    'import-sel',
-    'file-import',
 ];
 
 const camelCase = s => s.replace(/-[a-z]/g, m => m[1].toUpperCase());
@@ -200,130 +173,37 @@ const ui = Object.assign(...innerIDs.map(id => ({
     [camelCase(id)]: document.getElementById(`ilh-${id}`),
 })));
 
-ui.freezables = [ui.modeList, ui.modeRatings, ui.filmList, ui.start, ui.regexp, ui.searchMode];
-const elIMDbSearch = document.querySelector('input[data-testid="entity-autocomplete-input"]');
-const elIMDbResults = document.getElementById('react-autowhatever-1');
+ui.freezables = [ui.filmList, ui.start, ui.regexp, ui.searchMode];
 
 // ----- HANDLERS AND ACTIONS -----
 
-const convertRating = n => Math.ceil(n / 10) || 1; // 0..100 -> 1..10
-// d3 skips a row if a row conversion function returns null
-const joinOrSkip = (...fields) => (fields.includes(undefined) ? null : fields.join(','));
-const rowConverters = {
-    imdb: row => joinOrSkip(row['Your Rating'], row.Const),
-    rym: row => joinOrSkip(row.Rating, row.Title),
-    // .csv exported from Criticker have spaces between column names
-    criticker: row => joinOrSkip(convertRating(+row.Score), row[' IMDB ID']),
-};
+// eslint-disable-next-line no-promise-executor-return
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-const prepareImport = e => {
-    const isLegalParser = Boolean(rowConverters[e.target.value]); // in case of html-js mismatch
-    ui.fileImport.disabled = !isLegalParser;
-};
-
-const handleImport = e => {
-    const format = ui.importSel.value;
-    const reader = new FileReader();
-    reader.onload = event => {
-        const fileStr = event.target.result;
-        ui.filmList.value = d3.csvParse(fileStr, rowConverters[format]).join('\n');
-    };
-
-    const [file] = e.target.files;
-    reader.readAsText(file);
-};
-
-const RatingManager = {
-    rating: 0,
-    regex: /^([1-9]|10),(.*)$/i,
-    match: (line, mode, regex) => regex.exec(line),
-    processMatch: ([, rating, filmTitle], callback) => {
-        RatingManager.rating = rating;
-        callback(filmTitle);
-    },
-    afterClick: async (imdbID, callback) => {
-        console.log(`RatingManager::afterClick: Rating ${imdbID}`);
-        const moviePage = await fetch(
-            `http://www.imdb.com/title/${imdbID}/`,
-            { credentials: 'same-origin' },
-        );
-        const authHash = new DOMParser()
-            .parseFromString(await moviePage.text(), 'text/html')
-            .getElementById('star-rating-widget')
-            .dataset.auth;
-
-        const params = {
-            tconst: imdbID,
-            rating: RatingManager.rating,
-            auth: authHash,
-            tracking_tag: 'list',
-        };
-
-        const postResp = await fetch('http://www.imdb.com/ratings/_ajax/title', {
-            method: 'POST',
-            body: new URLSearchParams(params),
-            credentials: 'same-origin',
-        });
-
-        if (postResp.ok) {
-            callback();
-        } else {
-            alert(`Rating failed. Status code ${postResp.status}`);
-        }
-    },
-};
-
-const ListManager = {
+const App = {
     regex: /((?:tt|nm)\d+)/i, // IMDb IDs
     match: (line, mode, regex) => ({
         /* eslint-disable no-sparse-arrays */
         // 'auto' - search for an id (if a string has one) or for a full non-empty string
-        auto: s => ListManager.regex.exec(s) || (s && [, s]),
-        imdbid: s => ListManager.regex.exec(s),
+        auto: s => App.regex.exec(s) || (s && [, s]),
+        imdbid: s => App.regex.exec(s),
         line: s => s && [, s],
         regexp: s => regex.exec(s),
         /* eslint-enable no-sparse-arrays */
     })[mode](line),
-    processMatch: ([, filmTitle], callback) => callback(filmTitle),
-    afterClick: (imdbID, callback) => callback(),
-};
-
-const App = {
-    manager: ListManager,
     films: [],
     regexObj: null,
-    run: () => {
+    run: async () => {
         // Set the default value for the 'Regexp' mode
-        ui.regexp.value = App.manager.regex.source;
-
-        ui.importSel.addEventListener('change', prepareImport);
-        ui.fileImport.addEventListener('change', handleImport);
+        ui.regexp.value = App.regex.source;
 
         ui.searchMode.addEventListener('change', () => {
             ui.regexpBox.style.display = ui.searchMode.value === 'regexp' ? '' : 'none';
             ui.filmList.placeholder = searchModeHints[ui.searchMode.value];
         });
 
-        ui.modeList.addEventListener('change', () => {
-            App.manager = ListManager;
-            ui.import.style.display = 'none';
-            ui.regexp.value = App.manager.regex.source;
-            ui.regexpBox.style.display = ui.searchMode.value === 'regexp' ? '' : 'none';
-            ui.searchModeBox.style.display = '';
-            ui.filmList.placeholder = searchModeHints[ui.searchMode.value];
-        });
-
-        ui.modeRatings.addEventListener('change', () => {
-            App.manager = RatingManager;
-            ui.import.style.display = '';
-            ui.regexp.value = App.manager.regex.source;
-            ui.regexpBox.style.display = '';
-            ui.searchModeBox.style.display = 'none';
-            ui.filmList.placeholder = searchModeHints.rating;
-        });
-
-        ui.start.addEventListener('click', () => {
-            // This will be used only for ListManager's 'regexp' mode or RatingManager
+        ui.start.addEventListener('click', async () => {
+            // This will be used only for 'regexp' mode
             App.regexObj = new RegExp(ui.regexp.value, 'i');
 
             // Disable relevant UI elements
@@ -332,20 +212,12 @@ const App = {
             });
 
             App.films = ui.filmList.value.trim().split('\n');
-            App.handleNext();
+            await App.handleNext();
         });
-
-        // When the search popup loses focus, IMDb will hide it after 300 ms,
-        // so all button clicks that want to keep it visible need to be delayed
-        ui.skip.addEventListener('click', () =>
-            setTimeout(() => App.handleNext(), 350));
-
-        ui.retry.addEventListener('click', () =>
-            setTimeout(() => elIMDbSearch.dispatchEvent(new Event('keydown')), 350));
     },
-    handleNext: () => {
+    handleNext: async () => {
         if (App.films.length) {
-            App.search(App.films.shift());
+            await App.search(App.films.shift());
         } else { // if last film
             App.reset();
         }
@@ -359,42 +231,44 @@ const App = {
         });
 
         ui.currentFilm.value = '';
-        elIMDbSearch.value = '';
     },
-    search: line => {
+    search: async line => {
         line = line.trim();
         ui.currentFilm.value = line;
         ui.filmsRemaining.textContent = App.films.length;
         ui.filmList.value = App.films.join('\n');
 
-        const result = App.manager.match(line, ui.searchMode.value, App.regexObj);
+        const result = App.match(line, ui.searchMode.value, App.regexObj);
         if (result) {
-            App.manager.processMatch(result, filmTitle => {
-                // Set imdb search input field to film title and trigger search
-                elIMDbSearch.value = filmTitle;
-                elIMDbSearch.dispatchEvent(new Event('keydown'));
-            });
-        } else {
-            App.handleNext();
+            console.log(`Searching for: ${result[1]}`);
+            await App.fetch(result[1]);
+            await sleep(REQUEST_DELAY);
         }
+
+        await App.handleNext();
+    },
+    fetch: async imdbid => {
+        await fetch('https://api.graphql.imdb.com/', {
+            method: 'POST',
+            mode: 'cors',
+            credentials: 'include',
+            headers: {
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                query: 'mutation AddConstToList($listId: ID!, $constId: ID!, $includeListItemMetadata: Boolean!, $refTagQueryParam: String, $originalTitleText: Boolean, $isInPace: Boolean! = false) {\n  addItemToList(input: {listId: $listId, item: {itemElementId: $constId}}) {\n    listId\n    modifiedItem {\n      ...EditListItemMetadata\n      listItem @include(if: $includeListItemMetadata) {\n        ... on Title {\n          ...TitleListItemMetadata\n        }\n        ... on Name {\n          ...NameListItemMetadata\n        }\n        ... on Image {\n          ...ImageListItemMetadata\n        }\n        ... on Video {\n          ...VideoListItemMetadata\n        }\n      }\n    }\n  }\n}\n\nfragment EditListItemMetadata on ListItemNode {\n  itemId\n  createdDate\n  absolutePosition\n  description {\n    originalText {\n      markdown\n      plaidHtml(showLineBreak: true)\n      plainText\n    }\n  }\n}\n\nfragment TitleListItemMetadata on Title {\n  ...TitleListItemMetadataEssentials\n  latestTrailer {\n    id\n  }\n  plot {\n    plotText {\n      plainText\n    }\n  }\n  releaseDate {\n    day\n    month\n    year\n  }\n  productionStatus {\n    currentProductionStage {\n      id\n      text\n    }\n  }\n}\n\nfragment TitleListItemMetadataEssentials on Title {\n  ...BaseTitleCard\n  series {\n    series {\n      id\n      originalTitleText {\n        text\n      }\n      releaseYear {\n        endYear\n        year\n      }\n      titleText {\n        text\n      }\n    }\n  }\n}\n\nfragment BaseTitleCard on Title {\n  id\n  titleText {\n    text\n  }\n  titleType {\n    id\n    text\n    canHaveEpisodes\n    displayableProperty {\n      value {\n        plainText\n      }\n    }\n  }\n  originalTitleText {\n    text\n  }\n  primaryImage {\n    id\n    width\n    height\n    url\n    caption {\n      plainText\n    }\n  }\n  releaseYear {\n    year\n    endYear\n  }\n  ratingsSummary {\n    aggregateRating\n    voteCount\n  }\n  runtime {\n    seconds\n  }\n  certificate {\n    rating\n  }\n  canRate {\n    isRatable\n  }\n  titleGenres {\n    genres(limit: 3) {\n      genre {\n        text\n      }\n    }\n  }\n  canHaveEpisodes\n}\n\nfragment NameListItemMetadata on Name {\n  id\n  primaryImage {\n    url\n    caption {\n      plainText\n    }\n    width\n    height\n  }\n  nameText {\n    text\n  }\n  primaryProfessions {\n    category {\n      text\n    }\n  }\n  professions {\n    profession {\n      text\n    }\n  }\n  knownForV2(limit: 1) @include(if: $isInPace) {\n    credits {\n      title {\n        id\n        originalTitleText {\n          text\n        }\n        titleText {\n          text\n        }\n        titleType {\n          canHaveEpisodes\n        }\n        releaseYear {\n          year\n          endYear\n        }\n      }\n      episodeCredits(first: 0) {\n        yearRange {\n          year\n          endYear\n        }\n      }\n    }\n  }\n  knownFor(first: 1) {\n    edges {\n      node {\n        summary {\n          yearRange {\n            year\n            endYear\n          }\n        }\n        title {\n          id\n          originalTitleText {\n            text\n          }\n          titleText {\n            text\n          }\n          titleType {\n            canHaveEpisodes\n          }\n        }\n      }\n    }\n  }\n  bio {\n    displayableArticle {\n      body {\n        plaidHtml(\n          queryParams: $refTagQueryParam\n          showOriginalTitleText: $originalTitleText\n        )\n      }\n    }\n  }\n}\n\nfragment ImageListItemMetadata on Image {\n  id\n  url\n  height\n  width\n  caption {\n    plainText\n  }\n  names(limit: 4) {\n    id\n    nameText {\n      text\n    }\n  }\n  titles(limit: 1) {\n    id\n    titleText {\n      text\n    }\n    originalTitleText {\n      text\n    }\n    releaseYear {\n      year\n      endYear\n    }\n  }\n}\n\nfragment VideoListItemMetadata on Video {\n  id\n  thumbnail {\n    url\n    width\n    height\n  }\n  name {\n    value\n    language\n  }\n  description {\n    value\n    language\n  }\n  runtime {\n    unit\n    value\n  }\n  primaryTitle {\n    id\n    originalTitleText {\n      text\n    }\n    titleText {\n      text\n    }\n    titleType {\n      canHaveEpisodes\n    }\n    releaseYear {\n      year\n      endYear\n    }\n  }\n}',
+                operationName: 'AddConstToList',
+                variables: {
+                    listId: window.location.href.match(/ls\d+/)[0],
+                    constId: imdbid,
+                    includeListItemMetadata: true,
+                    refTagQueryParam: 'lsedt_add_items',
+                    originalTitleText: false,
+                    isInPace: false,
+                },
+            }),
+        });
     },
 };
-
-// Handle clicks on search results by a user or the script
-elIMDbResults.addEventListener('click', e => {
-    const imdbID = e.target.closest('a').dataset.const;
-    if (!imdbID || !imdbID.startsWith('tt')) return;
-    App.manager.afterClick(imdbID, () => {
-        setTimeout(() => App.handleNext(), REQUEST_DELAY);
-    });
-});
-
-// Monitor for changes to the search result box.
-// If the search was for IMDb URL/ID, the only result is clicked automatically
-const mut = new MutationObserver(mutList => mutList.forEach(({ addedNodes }) => {
-    if (!addedNodes.length || !/(nm|tt)\d{7}/i.test(ui.currentFilm.value)) return;
-    addedNodes[0].click();
-}));
-mut.observe(elIMDbResults, { childList: true });
 
 App.run();
